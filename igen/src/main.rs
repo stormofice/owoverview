@@ -21,14 +21,7 @@ fn main() {
 }
 
 fn draw_dashboard(image: &mut EpdImage) {
-    let mut total = Area::new(
-        0,
-        0,
-        EPD_WIDTH,
-        EPD_HEIGHT,
-        Color::White,
-        Padding { dx: 4, dy: 4 },
-    );
+    let mut total = Area::new(0, 0, EPD_WIDTH, EPD_HEIGHT, Color::White, Padding::full(4));
 
     let mut left_column = Area::new(
         0,
@@ -36,7 +29,7 @@ fn draw_dashboard(image: &mut EpdImage) {
         200,
         total.get_available_vspace(),
         Color::Black,
-        Padding { dx: 0, dy: 0 },
+        Padding::full(0),
     );
 
     let calendar_area = Area::new(
@@ -45,7 +38,12 @@ fn draw_dashboard(image: &mut EpdImage) {
         left_column.get_available_hspace(),
         left_column.get_available_vspace() / 2,
         Color::White,
-        Padding { dx: 4, dy: 4 },
+        Padding {
+            top: 4,
+            bottom: 2,
+            left: 4,
+            right: 4,
+        },
     );
 
     let weather_area = Area::new(
@@ -54,7 +52,12 @@ fn draw_dashboard(image: &mut EpdImage) {
         left_column.get_available_hspace(),
         left_column.get_available_vspace() / 2,
         Color::White,
-        Padding { dx: 4, dy: 4 },
+        Padding {
+            top: 2,
+            bottom: 4,
+            left: 4,
+            right: 4,
+        },
     );
 
     left_column.add_sub_area(calendar_area);
@@ -66,8 +69,21 @@ fn draw_dashboard(image: &mut EpdImage) {
 }
 
 struct Padding {
-    dx: usize,
-    dy: usize,
+    top: usize,
+    bottom: usize,
+    left: usize,
+    right: usize,
+}
+
+impl Padding {
+    fn full(pad: usize) -> Self {
+        Padding {
+            top: pad,
+            bottom: pad,
+            left: pad,
+            right: pad,
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -117,10 +133,10 @@ impl Area {
             height,
         };
         let dr = Rect {
-            x: padding.dx,
-            y: padding.dy,
-            width: width - (2 * padding.dx),
-            height: height - (2 * padding.dy),
+            x: padding.left,
+            y: padding.top,
+            width: width - padding.left - padding.right,
+            height: height - padding.top - padding.bottom,
         };
 
         let mut buf = vec![vec![Color::White; width]; height];

@@ -21,60 +21,147 @@ fn main() {
 }
 
 fn draw_dashboard(image: &mut EpdImage) {
-    const PADDING: usize = 4;
-    let padded_v_split = (EPD_HEIGHT - (3 * PADDING)) / 2;
+    let mut total = Area::new(
+        0,
+        0,
+        EPD_WIDTH,
+        EPD_HEIGHT,
+        Color::White,
+        Padding { dx: 0, dy: 0 },
+    );
 
-    let cal_area = Area::new(4, 4, 200, padded_v_split).with_fill(Color::Black);
-    let weather_area =
-        Area::new(4, 4 + padded_v_split + 4, 200, padded_v_split).with_fill(Color::Black);
+    let mut left_column = Area::new(
+        0,
+        0,
+        200,
+        EPD_HEIGHT,
+        Color::Black,
+        Padding { dx: 4, dy: 4 },
+    );
 
-    cal_area.render(image);
-    weather_area.render(image);
+    let calendar_area = Area::new(
+        0,
+        0,
+        200,
+        left_column.canvas.height / 2,
+        Color::White,
+        Padding { dx: 2, dy: 2 },
+    );
+
+    let weather_area = Area::new(
+        0,
+        left_column.canvas.height / 2,
+        200,
+        left_column.canvas.height / 2,
+        Color::White,
+        Padding { dx: 2, dy: 2 },
+    );
+
+    left_column.add_sub_area(calendar_area);
+    // left_column.add_sub_area(weather_area);
+
+    total.add_sub_area(left_column);
+
+    total.draw(image)
 }
 
-struct Area {
+struct Padding {
+    dx: usize,
+    dy: usize,
+}
+
+#[derive(Copy, Clone)]
+struct Rect {
     x: usize,
     y: usize,
     width: usize,
     height: usize,
+}
+
+impl Rect {
+    fn set_px(&self, buf: &mut [Vec<Color>], x: usize, y: usize, color: Color) {
+        buf[self.y + y][self.x + x] = color;
+    }
+
+    fn get_px(&self, buf: &[Vec<Color>], x: usize, y: usize) -> Color {
+        buf[self.y + y][self.x + x]
+    }
+}
+
+struct Offset {
+    x: usize,
+    y: usize,
+}
+
+struct Area {
+    space: Rect,
+    canvas: Rect,
+    offset: Offset,
 
     fill: Color,
+    padding: Padding,
 
     buf: Vec<Vec<Color>>,
+    children: Vec<Area>,
 }
 
 impl Area {
-    fn new(x: usize, y: usize, width: usize, height: usize) -> Self {
-        Self {
-            x,
-            y,
+    fn new(x: usize, y: usize, width: usize, height: usize, fill: Color, padding: Padding) -> Self {
+        let space = Rect {
+            x: 0,
+            y: 0,
             width,
             height,
-            fill: Color::White,
-            buf: vec![vec![Color::White; width]; height],
+        };
+        let dr = Rect {
+            x: padding.dx,
+            y: padding.dy,
+            width: width - (2 * padding.dx),
+            height: height - (2 * padding.dy),
+        };
+
+        let mut buf = vec![vec![Color::White; width]; height];
+
+        for x in 0..dr.width {
+            for y in 0..dr.height {
+                dr.set_px(&mut buf, x, y, fill)
+            }
+        }
+
+        Self {
+            space,
+            canvas: dr,
+            offset: Offset { x, y },
+            fill,
+            padding,
+            buf,
+            children: vec![],
         }
     }
 
-    fn with_fill(mut self, fill: Color) -> Self {
-        self.fill = fill;
-        self.buf.iter_mut().for_each(|v| v.fill(fill));
-        self
+    fn add_sub_area(&mut self, mut area: Area) {
+        area.offset.x += self.offset.x;
+        area.offset.y += self.offset.y;
+
+        self.children.push(area)
+    }
+
+    fn draw(&self, image: &mut EpdImage) {
+        self.render(image);
+
+        self.children.iter().for_each(|c| c.draw(image));
     }
 
     fn render(&self, image: &mut EpdImage) {
-        for y in self.y..(self.y + self.height) {
-            for x in self.x..(self.x + self.width) {
-                image.set_pixel(x, y, self.get_px(x, y));
+        for y in 0..self.canvas.height {
+            for x in 0..self.canvas.width {
+                image.set_pixel(
+                    x + self.offset.x,
+                    y + self.offset.y,
+                    self.space.get_px(&self.buf, x, y),
+                );
             }
         }
-    }
-
-    fn set_px(&mut self, x: usize, y: usize, color: Color) {
-        self.buf[y - self.y][x - self.x] = color;
-    }
-
-    fn get_px(&self, x: usize, y: usize) -> Color {
-        self.buf[y - self.y][x - self.x]
     }
 }
 

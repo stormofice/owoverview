@@ -27,42 +27,42 @@ fn draw_dashboard(image: &mut EpdImage) {
         EPD_WIDTH,
         EPD_HEIGHT,
         Color::White,
-        Padding { dx: 0, dy: 0 },
+        Padding { dx: 4, dy: 4 },
     );
 
     let mut left_column = Area::new(
         0,
         0,
         200,
-        EPD_HEIGHT,
+        total.get_available_vspace(),
         Color::Black,
-        Padding { dx: 4, dy: 4 },
+        Padding { dx: 0, dy: 0 },
     );
 
     let calendar_area = Area::new(
         0,
         0,
-        200,
-        left_column.canvas.height / 2,
+        left_column.get_available_hspace(),
+        left_column.get_available_vspace() / 2,
         Color::White,
-        Padding { dx: 2, dy: 2 },
+        Padding { dx: 4, dy: 4 },
     );
 
     let weather_area = Area::new(
         0,
-        left_column.canvas.height / 2,
-        200,
-        left_column.canvas.height / 2,
+        left_column.get_available_vspace() / 2,
+        left_column.get_available_hspace(),
+        left_column.get_available_vspace() / 2,
         Color::White,
-        Padding { dx: 2, dy: 2 },
+        Padding { dx: 4, dy: 4 },
     );
 
     left_column.add_sub_area(calendar_area);
-    // left_column.add_sub_area(weather_area);
+    left_column.add_sub_area(weather_area);
 
     total.add_sub_area(left_column);
 
-    total.draw(image)
+    total.draw(image);
 }
 
 struct Padding {
@@ -94,8 +94,11 @@ struct Offset {
 }
 
 struct Area {
+    // In relative coordinates (total area)
     space: Rect,
+    // In relative coordinates (drawable area (-padding, decorations, ...))
     canvas: Rect,
+    // True x,y offset of space to image
     offset: Offset,
 
     fill: Color,
@@ -140,8 +143,12 @@ impl Area {
     }
 
     fn add_sub_area(&mut self, mut area: Area) {
-        area.offset.x += self.offset.x;
-        area.offset.y += self.offset.y;
+        area.offset.x += (self.offset.x + self.canvas.x);
+        area.offset.y += (self.offset.y + self.canvas.y);
+        area.children.iter_mut().for_each(|area| {
+            area.offset.x += (self.offset.x + self.canvas.x);
+            area.offset.y += (self.offset.y + self.canvas.y);
+        });
 
         self.children.push(area)
     }
@@ -156,12 +163,20 @@ impl Area {
         for y in 0..self.canvas.height {
             for x in 0..self.canvas.width {
                 image.set_pixel(
-                    x + self.offset.x,
-                    y + self.offset.y,
+                    x + self.offset.x + self.canvas.x,
+                    y + self.offset.y + self.canvas.y,
                     self.space.get_px(&self.buf, x, y),
                 );
             }
         }
+    }
+
+    fn get_available_vspace(&self) -> usize {
+        self.canvas.height
+    }
+
+    fn get_available_hspace(&self) -> usize {
+        self.canvas.width
     }
 }
 

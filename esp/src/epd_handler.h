@@ -12,6 +12,7 @@ enum class EpdJobKind
     Sleep,
     Display,
     Init,
+    DisplayPartial,
 
     Undefined,
 };
@@ -22,14 +23,20 @@ private:
     EpdJobKind kind;
     uint8_t* data;
     size_t size;
+    uint64_t aux[16];
 
 public:
-    explicit EpdJob(const EpdJobKind kind) : kind(kind), data(nullptr), size(0)
+    explicit EpdJob(const EpdJobKind kind) : kind(kind), data(nullptr), size(0), aux{0}
     {
     }
 
-    EpdJob(const EpdJobKind kind, uint8_t* data, const size_t size) : kind(kind), data(data), size(size)
+    EpdJob(const EpdJobKind kind, uint8_t* data, const size_t size) : kind(kind), data(data), size(size), aux {0}
     {
+    }
+
+    EpdJob(const EpdJobKind kind, uint8_t* data, const size_t size, uint64_t aux[16]) : kind(kind), data(data), size(size) , aux{0}
+    {
+        memcpy(this->aux, aux, sizeof(this->aux));
     }
 
     EpdJobKind getKind() const
@@ -46,6 +53,12 @@ public:
     {
         return size;
     }
+
+    uint64_t getAux(const int index) const
+    {
+        return aux[index];
+    }
+
 };
 
 class EpdHandler

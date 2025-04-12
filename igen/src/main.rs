@@ -1,7 +1,7 @@
 use fontdue::layout::{
     CoordinateSystem, HorizontalAlign, Layout, LayoutSettings, TextStyle, VerticalAlign, WrapStyle,
 };
-use fontdue::{Font, FontSettings, Metrics};
+use fontdue::{Font, FontSettings};
 use image::{GenericImageView, Luma, Pixel};
 use std::io::Write;
 
@@ -25,10 +25,27 @@ enum Color {
 fn main() {
     let mut image = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
 
-    draw_dashboard(&mut image);
+    // draw_dashboard(&mut image);
+
+    let w = 0;
+    let h = 0;
+    let x = 0;
+    let y = 0;
+
+    println!(
+        r#"curl -v -F 'data=@output.bin' '192.168.178.61/upload_image_partial?rect={},{},{},{}'"#,
+        x, y, w, h
+    );
+    partial_test(&mut image, x, y, w, h);
 
     image.to_file("output.bin");
     image.to_img_file("output.png");
+}
+
+fn partial_test(image: &mut EpdImage, x: usize, y: usize, w: usize, h: usize) {
+    let square = Area::new(x, y, w, h, Color::Black, Padding::full(0), Outline::none());
+    println!("{} * {} = {}", w, h, w * h);
+    square.draw(image);
 }
 
 fn draw_dashboard(image: &mut EpdImage) {
@@ -382,10 +399,6 @@ impl Area {
     }
 
     fn render(&self, image: &mut EpdImage) {
-        if self.buf.len() == 332 {
-            let k = 0;
-        }
-
         for y in 0..self.space.height {
             for x in 0..self.space.width {
                 image.set_pixel(

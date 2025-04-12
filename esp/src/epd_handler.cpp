@@ -2,6 +2,10 @@
 
 void EpdHandler::start_worker()
 {
+    EPD_7IN5_V2_Init();
+    EPD_7IN5_V2_Clear();
+    EPD_7IN5_V2_Sleep();
+
     xTaskCreate(
         [](void* raw_queue) {
             const auto queue_handle = static_cast<QueueHandle_t*>(raw_queue);
@@ -28,6 +32,7 @@ void EpdHandler::start_worker()
                             EPD_7IN5_V2_Init();
                             break;
                         case EpdJobKind::Display: {
+                            EPD_7IN5_V2_Init();
                             printf("display task, buf: %p, len: %d\r\n", msg.getData(), msg.getSize());
 
                             // ensure size match
@@ -41,6 +46,30 @@ void EpdHandler::start_worker()
                                 // prevent mem leak
                                 delete msg.getData();
                             }
+                            EPD_7IN5_V2_Sleep();
+                            break;
+                        }
+                        case EpdJobKind::DisplayPartial: {
+                            EPD_7IN5_V2_Init_Part();
+                            printf("display partial task, buf: %p, len: %d\r\n", msg.getData(), msg.getSize());
+                            const auto x = msg.getAux(0);
+                            const auto y = msg.getAux(1);
+                            const auto w = msg.getAux(2);
+                            const auto h = msg.getAux(3);
+                            printf("x: %llu, y: %llu, w: %llu, h: %llu\r\n", x,y,w,h);
+                            delay(10);
+                            // ensure size match
+                            if (msg.getSize() != ((EPD_7IN5_V2_WIDTH / 8) * EPD_7IN5_V2_HEIGHT)) {
+                                printf("size mismatch\r\n");
+                            }
+                            else {
+                                printf("size match, sending to epd\r\n");
+                                EPD_7IN5_V2_Display_Part(msg.getData(), x, y, x + w, y + h);
+                                // prevent mem leak
+                                delete msg.getData();
+                            }
+                            EPD_7IN5_V2_Sleep();
+
                             break;
                         }
                         case EpdJobKind::Undefined:

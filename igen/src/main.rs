@@ -1,3 +1,7 @@
+use fontdue::layout::{
+    CoordinateSystem, HorizontalAlign, Layout, LayoutSettings, TextStyle, VerticalAlign, WrapStyle,
+};
+use fontdue::{Font, FontSettings, Metrics};
 use image::{GenericImageView, Luma, Pixel};
 use std::io::Write;
 
@@ -28,6 +32,9 @@ fn main() {
 }
 
 fn draw_dashboard(image: &mut EpdImage) {
+    let font_data = include_bytes!("../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8];
+    let font = Font::from_bytes(font_data, FontSettings::default()).expect("Could not load font");
+
     let mut total = Area::new(
         0,
         0,
@@ -58,7 +65,7 @@ fn draw_dashboard(image: &mut EpdImage) {
         Outline::none(),
     );
 
-    let quote_area = Area::new(
+    let mut quote_area = Area::new(
         0,
         right_column.get_available_vspace() - 140,
         right_column.get_available_hspace(),
@@ -72,6 +79,11 @@ fn draw_dashboard(image: &mut EpdImage) {
             top: 2,
             color: Color::Black,
         },
+    );
+    quote_area.layout_text(
+        &font,
+        "There is no prize to perfection.. only an end to pursuit",
+        32.0,
     );
 
     let misc_column = Area::new(
@@ -307,6 +319,48 @@ impl Area {
             outline,
             buf,
             children: vec![],
+        }
+    }
+
+    fn layout_text(&mut self, font: &Font, text: &str, text_size: f32) {
+        let mut layout: Layout = Layout::new(CoordinateSystem::PositiveYDown);
+        layout.reset(&LayoutSettings {
+            x: 0.0,
+            y: 0.0,
+            max_width: Some(self.get_available_hspace() as f32),
+            max_height: Some(self.get_available_vspace() as f32),
+            horizontal_align: HorizontalAlign::Left,
+            vertical_align: VerticalAlign::Top,
+            wrap_style: WrapStyle::Word,
+            wrap_hard_breaks: true,
+            ..LayoutSettings::default()
+        });
+
+        layout.append(&[font], &TextStyle::new(text, text_size, 0));
+
+        for glyph in layout.glyphs() {
+            println!("glyph x {} y {}", glyph.x, glyph.y);
+            let (metrics, bitmap) = font.rasterize_config(glyph.key);
+            for y in 0..metrics.height {
+                for x in 0..metrics.width {
+                    let idx = y * metrics.width + x;
+                    let coverage = bitmap[idx];
+
+                    //println!("coverage: {coverage}");
+
+                    let color = if (coverage > 160) {
+                        PixelColor::Black
+                    } else {
+                        PixelColor::White
+                    };
+                    self.canvas.set_px(
+                        &mut self.buf,
+                        (x as f32 + glyph.x) as usize,
+                        (y as f32 + glyph.y) as usize,
+                        color,
+                    )
+                }
+            }
         }
     }
 

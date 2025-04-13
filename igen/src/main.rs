@@ -25,49 +25,10 @@ enum Color {
 fn main() {
     let mut image = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
 
-    // draw_dashboard(&mut image);
-
-    let w = 400;
-    let h = 100;
-    let x = 0;
-    let y = 0;
-
-    println!(
-        r#"curl -v -F 'data=@output.bin' '192.168.178.61/upload_image_partial?rect={},{},{},{}'"#,
-        x, y, w, h
-    );
-    partial_test(&mut image, x, y, w, h, Color::Black);
+    draw_dashboard(&mut image);
 
     image.to_file("output.bin");
     image.to_img_file("output.png");
-    image.to_file_partial("output_256x256.bin", 0, 0, 256, 256);
-    image.to_file_partial("output_512x128.bin", 0, 0, 512, 128);
-    image.to_file_partial("output_264x264.bin", 0, 0, 264, 264);
-    image.to_file_partial("output_304x304.bin", 0, 0, 304, 304);
-    image.to_file_partial("output_384x384.bin", 0, 0, 384, 384);
-    image.to_file_partial("output_512x256.bin", 0, 0, 512, 256);
-    image.to_file_partial("output_512x480.bin", 0, 0, 512, EPD_HEIGHT);
-    image.to_file_partial("output_800x480_b.bin", 0, 0, EPD_WIDTH, EPD_HEIGHT);
-    partial_test(&mut image, x, y, w, h, Color::White);
-    image.to_file_partial("output_800x480_w.bin", 0, 0, EPD_WIDTH, EPD_HEIGHT);
-}
-
-fn partial_test(image: &mut EpdImage, x: usize, y: usize, w: usize, h: usize, clr: Color) {
-    let font_data = include_bytes!("../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8];
-    let font = Font::from_bytes(font_data, FontSettings::default()).expect("Could not load font");
-
-    let mut square = Area::new(
-        x,
-        y,
-        EPD_WIDTH,
-        EPD_HEIGHT,
-        clr,
-        Padding::full(0),
-        Outline::none(),
-    );
-    println!("{} * {} = {}", w, h, w * h);
-    // square.layout_text(&font, "world", 20.0);
-    square.draw(image);
 }
 
 fn draw_dashboard(image: &mut EpdImage) {

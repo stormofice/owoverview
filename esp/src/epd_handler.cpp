@@ -43,11 +43,13 @@ void EpdHandler::start_worker()
                                 printf("size mismatch\r\n");
                             }
                             else {
+                                delay(200);
                                 printf("size match, sending to epd\r\n");
                                 EPD_7IN5_V2_Display(msg.getData());
 
                                 // prevent mem leak
                             }
+                            delay(20);
                             delete msg.getData();
                             EPD_7IN5_V2_Sleep();
                             break;

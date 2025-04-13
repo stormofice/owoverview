@@ -1,9 +1,9 @@
-use fontdue::layout::{
-    CoordinateSystem, HorizontalAlign, Layout, LayoutSettings, TextStyle, VerticalAlign, WrapStyle,
-};
+use chrono::Timelike;
+use fontdue::layout::{CoordinateSystem, HorizontalAlign, Layout, LayoutSettings, TextStyle};
 use fontdue::{Font, FontSettings};
 use image::{GenericImageView, Luma, Pixel};
 use std::io::Write;
+use std::time::SystemTime;
 
 const EPD_WIDTH: usize = 800;
 const EPD_HEIGHT: usize = 480;
@@ -60,7 +60,7 @@ fn draw_dashboard(image: &mut EpdImage) {
         0,
         total.get_available_hspace() - left_column.space.width,
         total.get_available_vspace(),
-        Color::Gray,
+        Color::White,
         Padding::full(0),
         Outline::none(),
     );
@@ -80,20 +80,45 @@ fn draw_dashboard(image: &mut EpdImage) {
             color: Color::Black,
         },
     );
+
     quote_area.layout_text(
         &font,
-        "There is no prize to perfection.. only an end to pursuit",
-        32.0,
+        LayoutSettings {
+            max_height: Some(quote_area.get_available_vspace() as f32),
+            max_width: Some(quote_area.get_available_hspace() as f32),
+            ..LayoutSettings::default()
+        },
+        &[TextStyle::new(
+            "Do not worry if you have built your castles in the air. They are where \
+                    they should be. Now put the foundations under them.",
+            20f32,
+            0,
+        )],
+        100,
     );
 
-    let misc_column = Area::new(
+    let mut misc_column = Area::new(
         right_column.get_available_hspace() - 100,
         0,
         100,
         right_column.get_available_vspace() - quote_area.space.height,
-        Color::Black,
-        Padding::full(4),
+        Color::White,
+        Padding::full(0),
         Outline::default(),
+    );
+
+    let now = chrono::Local::now();
+    let now_str = format!("{}:{}", now.hour(), now.minute());
+    misc_column.layout_text(
+        &font,
+        LayoutSettings {
+            max_width: Some(misc_column.get_available_hspace() as f32),
+            max_height: Some(misc_column.get_available_vspace() as f32),
+            horizontal_align: HorizontalAlign::Center,
+            ..LayoutSettings::default()
+        },
+        &[TextStyle::new(now_str.as_str(), 32f32, 0)],
+        120,
     );
 
     right_column.add_sub_area(quote_area);
@@ -322,33 +347,28 @@ impl Area {
         }
     }
 
-    fn layout_text(&mut self, font: &Font, text: &str, text_size: f32) {
+    fn layout_text(
+        &mut self,
+        font: &Font,
+        layout_settings: LayoutSettings,
+        texts: &[TextStyle],
+        coverage_threshold: u8,
+    ) {
         let mut layout: Layout = Layout::new(CoordinateSystem::PositiveYDown);
-        layout.reset(&LayoutSettings {
-            x: 0.0,
-            y: 0.0,
-            max_width: Some(self.get_available_hspace() as f32),
-            max_height: Some(self.get_available_vspace() as f32),
-            horizontal_align: HorizontalAlign::Left,
-            vertical_align: VerticalAlign::Top,
-            wrap_style: WrapStyle::Word,
-            wrap_hard_breaks: true,
-            ..LayoutSettings::default()
-        });
+        layout.reset(&LayoutSettings { ..layout_settings });
 
-        layout.append(&[font], &TextStyle::new(text, text_size, 0));
+        for ts in texts {
+            layout.append(&[font], ts)
+        }
 
         for glyph in layout.glyphs() {
-            println!("glyph x {} y {}", glyph.x, glyph.y);
             let (metrics, bitmap) = font.rasterize_config(glyph.key);
             for y in 0..metrics.height {
                 for x in 0..metrics.width {
                     let idx = y * metrics.width + x;
                     let coverage = bitmap[idx];
 
-                    //println!("coverage: {coverage}");
-
-                    let color = if (coverage > 160) {
+                    let color = if (coverage > coverage_threshold) {
                         PixelColor::Black
                     } else {
                         PixelColor::White

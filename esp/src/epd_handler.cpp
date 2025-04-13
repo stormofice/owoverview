@@ -20,7 +20,10 @@ void EpdHandler::start_worker()
                     // Process the message
                     switch (msg.getKind()) {
                         case EpdJobKind::Clear:
+                            EPD_7IN5_V2_Init();
                             EPD_7IN5_V2_Clear();
+                            EPD_7IN5_V2_Sleep();
+
                             break;
                         case EpdJobKind::ClearBlack:
                             EPD_7IN5_V2_ClearBlack();
@@ -44,8 +47,8 @@ void EpdHandler::start_worker()
                                 EPD_7IN5_V2_Display(msg.getData());
 
                                 // prevent mem leak
-                                delete msg.getData();
                             }
+                            delete msg.getData();
                             EPD_7IN5_V2_Sleep();
                             break;
                         }
@@ -57,17 +60,17 @@ void EpdHandler::start_worker()
                             const auto w = msg.getAux(2);
                             const auto h = msg.getAux(3);
                             printf("x: %llu, y: %llu, w: %llu, h: %llu\r\n", x,y,w,h);
-                            delay(10);
                             // ensure size match
-                            if (msg.getSize() != ((EPD_7IN5_V2_WIDTH / 8) * EPD_7IN5_V2_HEIGHT)) {
+                            if (msg.getSize() != ((w / 8) * h)) {
                                 printf("size mismatch\r\n");
                             }
                             else {
-                                printf("size match, sending to epd\r\n");
+                                // This delay is mandatory (!) to prevent artifacting
+                                delay(250);
                                 EPD_7IN5_V2_Display_Part(msg.getData(), x, y, x + w, y + h);
-                                // prevent mem leak
-                                delete msg.getData();
                             }
+                            // prevent mem leak
+                            delete msg.getData();
                             EPD_7IN5_V2_Sleep();
 
                             break;

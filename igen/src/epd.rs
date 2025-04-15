@@ -161,13 +161,73 @@ impl Area {
         }
     }
 
-    pub fn layout_text(
+    pub fn auto_layout_text(
         &mut self,
         font: &Font,
         layout_settings: LayoutSettings,
         texts: &[TextStyle],
         coverage_threshold: u8,
     ) {
+        let mut current_text_size = 4f32;
+
+        let is_layout_possible = |texts: &[TextStyle]| -> bool {
+            let mut is_possible = false;
+            Self::layout_text(font, layout_settings, texts, |x, y, _| {
+                is_possible = !(x >= (self.canvas.x + self.canvas.width)
+                    || y >= (self.canvas.y + self.canvas.height));
+            });
+            is_possible
+        };
+
+        let mut largest_text_styles: Vec<TextStyle> = vec![];
+        loop {
+            let mut text_styles: Vec<TextStyle> = vec![];
+            for ts in texts {
+                text_styles.push(TextStyle::new(ts.text, current_text_size, 0));
+            }
+
+            if is_layout_possible(text_styles.as_slice()) {
+                current_text_size += 1f32;
+                largest_text_styles = text_styles;
+            } else {
+                break;
+            }
+        }
+
+        self.try_put_text(
+            font,
+            layout_settings,
+            largest_text_styles.as_slice(),
+            coverage_threshold,
+        )
+    }
+
+    pub fn try_put_text(
+        &mut self,
+        font: &Font,
+        layout_settings: LayoutSettings,
+        texts: &[TextStyle],
+        coverage_threshold: u8,
+    ) {
+        Self::layout_text(font, layout_settings, texts, |x, y, coverage| {
+            let color = if coverage > coverage_threshold {
+                PixelColor::Black
+            } else {
+                PixelColor::White
+            };
+            self.canvas.set_px(&mut self.buf, x, y, color)
+        });
+    }
+
+    fn layout_text<F>(
+        font: &Font,
+        layout_settings: LayoutSettings,
+        // lol
+        texts: &[TextStyle],
+        mut on_px: F,
+    ) where
+        F: FnMut(usize, usize, u8),
+    {
         let mut layout: Layout = Layout::new(CoordinateSystem::PositiveYDown);
         layout.reset(&LayoutSettings { ..layout_settings });
 
@@ -182,16 +242,10 @@ impl Area {
                     let idx = y * metrics.width + x;
                     let coverage = bitmap[idx];
 
-                    let color = if coverage > coverage_threshold {
-                        PixelColor::Black
-                    } else {
-                        PixelColor::White
-                    };
-                    self.canvas.set_px(
-                        &mut self.buf,
+                    on_px(
                         (x as f32 + glyph.x) as usize,
                         (y as f32 + glyph.y) as usize,
-                        color,
+                        coverage,
                     )
                 }
             }
@@ -227,12 +281,20 @@ impl Area {
         }
     }
 
+    pub fn get_hstart(&self) -> usize {
+        self.canvas.x
+    }
+
+    pub fn get_vstart(&self) -> usize {
+        self.canvas.y
+    }
+
     pub fn get_available_vspace(&self) -> usize {
-        self.canvas.height
+        self.canvas.height - self.get_vstart()
     }
 
     pub fn get_available_hspace(&self) -> usize {
-        self.canvas.width
+        self.canvas.width - self.get_hstart()
     }
 }
 

@@ -1,16 +1,107 @@
+use crate::calendar::{CalendarHandler, Event, Time};
 use crate::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::graphics::{Color, Rect};
 use chrono::Timelike;
-use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle};
+use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign, WrapStyle};
 use fontdue::{Font, FontSettings};
 
 pub struct Dash {
     previous: Option<EpdImage>,
+    calendar_handler: CalendarHandler,
 }
 
 impl Dash {
     pub fn new() -> Self {
-        Self { previous: None }
+        Self {
+            previous: None,
+            calendar_handler: CalendarHandler::new(),
+        }
+    }
+
+    fn create_calendar(&self, cal: &mut Area) {
+        let events = self.calendar_handler.fetch();
+
+        let mut y_offset: usize = cal.get_vstart();
+
+        const N_ENTRIES: usize = 6;
+        const ENTRY_PADDING: usize = 2;
+
+        let available_y_space = (cal.get_available_vspace() - ((N_ENTRIES - 1) * ENTRY_PADDING));
+        assert_eq!(
+            (available_y_space % N_ENTRIES),
+            0,
+            "Can't cleanly divide calendar area"
+        );
+        let entry_y_size: usize = available_y_space / N_ENTRIES;
+
+        // TODO: change font
+        let font_data = include_bytes!("../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8];
+        let font =
+            Font::from_bytes(font_data, FontSettings::default()).expect("Could not load font");
+
+        let mut add_event = |e: &Event| {
+            if y_offset >= cal.get_available_vspace() {
+                panic!("calendar event oob")
+            }
+
+            let mut entry_area = Area::new(
+                cal.get_hstart(),
+                y_offset,
+                cal.get_available_hspace(),
+                entry_y_size,
+                Color::White,
+                Padding::full(0),
+                Outline::default(),
+            );
+
+            println!("adding event: {:?}", e);
+
+            let fmt = match e.time {
+                Time::AllDay(date) => {
+                    format!("{} - {}", date.format("%d.%m"), e.title)
+                }
+                Time::Timed(start, delta) => {
+                    format!(
+                        "{} ({}h) {}",
+                        start.format("%d.%m:%H%M"),
+                        delta.num_hours(),
+                        e.title
+                    )
+                }
+            };
+
+            entry_area.auto_layout_text(
+                &font,
+                LayoutSettings {
+                    max_height: Some(entry_area.get_available_vspace() as f32),
+                    y: entry_area.get_vstart() as f32,
+                    x: entry_area.get_hstart() as f32,
+                    max_width: Some(entry_area.get_available_hspace() as f32),
+                    wrap_style: WrapStyle::Letter,
+                    horizontal_align: HorizontalAlign::Center,
+                    vertical_align: VerticalAlign::Middle,
+                    ..LayoutSettings::default()
+                },
+                &[TextStyle::new(fmt.as_str(), 16.0, 0)],
+                160,
+            );
+
+            cal.add_sub_area(entry_area);
+
+            y_offset += entry_y_size + ENTRY_PADDING;
+        };
+
+        // Sort by all day and timed
+        for event in events.iter().filter(|e| matches!(e.time, Time::AllDay(_))) {
+            add_event(event);
+        }
+
+        for event in events
+            .iter()
+            .filter(|e| matches!(e.time, Time::Timed(_, _)))
+        {
+            add_event(event);
+        }
     }
 
     fn create_dashboard(&self) -> EpdImage {
@@ -66,7 +157,7 @@ impl Dash {
             },
         );
 
-        quote_area.layout_text(
+        quote_area.try_put_text(
             &font,
             LayoutSettings {
                 max_height: Some(quote_area.get_available_vspace() as f32),
@@ -94,7 +185,7 @@ impl Dash {
 
         let now = chrono::Local::now();
         let now_str = format!("{}:{}", now.hour(), now.minute());
-        misc_column.layout_text(
+        misc_column.try_put_text(
             &font,
             LayoutSettings {
                 max_width: Some(misc_column.get_available_hspace() as f32),
@@ -109,7 +200,7 @@ impl Dash {
         right_column.add_sub_area(quote_area);
         right_column.add_sub_area(misc_column);
 
-        let calendar_area = Area::new(
+        let mut calendar_area = Area::new(
             0,
             0,
             left_column.get_available_hspace(),
@@ -124,6 +215,7 @@ impl Dash {
                 color: Color::Black,
             },
         );
+        self.create_calendar(&mut calendar_area);
 
         let weather_area = Area::new(
             0,
@@ -193,6 +285,9 @@ impl Dash {
         if let Some(bbox) = self.get_change_bbox(&current) {
             println!("change bbox: {:?}", bbox);
         }
+
+        current.to_img_file("output.png");
+        current.to_file("output.bin");
 
         self.previous = Some(current)
     }

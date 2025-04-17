@@ -1,4 +1,5 @@
 use crate::calendar::Time::{AllDay, Timed};
+use std::ops::Add;
 
 #[derive(Debug)]
 pub enum Time {
@@ -27,7 +28,9 @@ impl CalendarHandler {
             Event {
                 title: "Test Timed!".to_string(),
                 time: Timed(
-                    chrono::Local::now().with_timezone(&chrono::Utc),
+                    chrono::Local::now()
+                        .add(chrono::TimeDelta::days(2))
+                        .with_timezone(&chrono::Utc),
                     chrono::TimeDelta::minutes(63),
                 ),
             },

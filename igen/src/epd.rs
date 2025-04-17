@@ -168,13 +168,16 @@ impl Area {
         texts: &[TextStyle],
         coverage_threshold: u8,
     ) {
-        let mut current_text_size = 4f32;
+        let mut current_text_size = 1f32;
 
         let is_layout_possible = |texts: &[TextStyle]| -> bool {
-            let mut is_possible = false;
+            let mut is_possible = true;
             Self::layout_text(font, layout_settings, texts, |x, y, _| {
-                is_possible = !(x >= (self.canvas.x + self.canvas.width)
-                    || y >= (self.canvas.y + self.canvas.height));
+                if (x >= (self.canvas.x + self.canvas.width)
+                    || y >= (self.canvas.y + self.canvas.height))
+                {
+                    is_possible = false;
+                }
             });
             is_possible
         };
@@ -229,7 +232,7 @@ impl Area {
         F: FnMut(usize, usize, u8),
     {
         let mut layout: Layout = Layout::new(CoordinateSystem::PositiveYDown);
-        layout.reset(&LayoutSettings { ..layout_settings });
+        layout.reset(&layout_settings);
 
         for ts in texts {
             layout.append(&[font], ts)

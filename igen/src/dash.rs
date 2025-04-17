@@ -1,9 +1,10 @@
 use crate::calendar::{CalendarHandler, Event, Time};
 use crate::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::graphics::{Color, Rect};
-use chrono::Timelike;
+use chrono::{NaiveDate, Timelike};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign, WrapStyle};
 use fontdue::{Font, FontSettings};
+use std::collections::{BTreeSet, HashMap};
 
 pub struct Dash {
     previous: Option<EpdImage>,
@@ -15,6 +16,117 @@ impl Dash {
         Self {
             previous: None,
             calendar_handler: CalendarHandler::new(),
+        }
+    }
+
+    fn create_calendar_day_grouped(&self, cal: &mut Area) {
+        // TODO: change font
+        let font_data = include_bytes!("../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8];
+        let font =
+            Font::from_bytes(font_data, FontSettings::default()).expect("Could not load font");
+
+        let mut events_per_day: HashMap<NaiveDate, Vec<Event>> = HashMap::new();
+        let mut dates: BTreeSet<NaiveDate> = BTreeSet::new();
+        self.calendar_handler
+            .fetch()
+            .into_iter()
+            .for_each(|e| match e.time {
+                Time::AllDay(nd) => {
+                    dates.insert(nd);
+                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                        events_per_day.entry(nd)
+                    {
+                        entry.insert(vec![e]);
+                    } else {
+                        events_per_day.get_mut(&nd).unwrap().push(e);
+                    }
+                }
+                Time::Timed(dt, _) => {
+                    dates.insert(dt.date_naive());
+                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                        events_per_day.entry(dt.date_naive())
+                    {
+                        entry.insert(vec![e]);
+                    } else {
+                        events_per_day.get_mut(&dt.date_naive()).unwrap().push(e);
+                    }
+                }
+            });
+
+        const DAYS_SHOWN: usize = 2;
+        const EVENTS_PER_DAY: usize = 3;
+        const DATE_EVENT_PADDING: usize = 2;
+        const DATE_HEIGHT: usize = 32;
+        const EVENT_HEIGHT: usize = 24;
+        const EVENT_PADDING: usize = 2;
+
+        let mut cur_y = cal.get_vstart();
+
+        for date in dates.iter().take(DAYS_SHOWN) {
+            let mut date_area = Area::new(
+                cal.get_hstart(),
+                cur_y,
+                cal.get_available_hspace(),
+                DATE_HEIGHT,
+                Color::White,
+                Padding::full(0),
+                Outline::default(),
+            );
+            date_area.auto_layout_text(
+                &font,
+                LayoutSettings {
+                    x: date_area.get_hstart() as f32,
+                    y: date_area.get_vstart() as f32,
+                    max_width: Some(date_area.get_available_hspace() as f32),
+                    max_height: Some(date_area.get_available_vspace() as f32),
+                    horizontal_align: HorizontalAlign::Center,
+                    vertical_align: VerticalAlign::Middle,
+                    ..LayoutSettings::default()
+                },
+                &[TextStyle::new(
+                    date.format("%a, %-d. %b").to_string().as_str(),
+                    1.0,
+                    0,
+                )],
+                50,
+            );
+            cal.add_sub_area(date_area);
+
+            cur_y += DATE_HEIGHT + DATE_EVENT_PADDING;
+
+            for event in events_per_day
+                .get(date)
+                .unwrap()
+                .iter()
+                .take(EVENTS_PER_DAY)
+            {
+                let mut event_area = Area::new(
+                    cal.get_hstart(),
+                    cur_y,
+                    cal.get_available_hspace(),
+                    EVENT_HEIGHT,
+                    Color::White,
+                    Padding::full(0),
+                    Outline::none(),
+                );
+                event_area.auto_layout_text(
+                    &font,
+                    LayoutSettings {
+                        x: event_area.get_hstart() as f32,
+                        y: event_area.get_vstart() as f32,
+                        max_width: Some(event_area.get_available_hspace() as f32),
+                        max_height: Some(event_area.get_available_vspace() as f32),
+                        horizontal_align: HorizontalAlign::Left,
+                        vertical_align: VerticalAlign::Middle,
+                        ..LayoutSettings::default()
+                    },
+                    &[TextStyle::new(event.title.as_str(), 1.0, 0)],
+                    50,
+                );
+                cal.add_sub_area(event_area);
+
+                cur_y += EVENT_HEIGHT + EVENT_PADDING;
+            }
         }
     }
 
@@ -215,7 +327,7 @@ impl Dash {
                 color: Color::Black,
             },
         );
-        self.create_calendar(&mut calendar_area);
+        self.create_calendar_day_grouped(&mut calendar_area);
 
         let weather_area = Area::new(
             0,

@@ -109,6 +109,12 @@ impl Dash {
                     Padding::full(0),
                     Outline::none(),
                 );
+
+                let text = match event.time {
+                    Time::AllDay(_) => &event.title,
+                    Time::Timed(dt, td) => &format!("{} {}", dt.format("%H:%M"), event.title),
+                };
+
                 event_area.auto_layout_text(
                     &font,
                     LayoutSettings {
@@ -120,7 +126,7 @@ impl Dash {
                         vertical_align: VerticalAlign::Middle,
                         ..LayoutSettings::default()
                     },
-                    &[TextStyle::new(event.title.as_str(), 1.0, 0)],
+                    &[TextStyle::new(text, 1.0, 0)],
                     50,
                 );
                 cal.add_sub_area(event_area);

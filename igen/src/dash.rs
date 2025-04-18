@@ -2,6 +2,7 @@ use crate::calendar::{CalendarHandler, Event, Time};
 use crate::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::fonts::{Font, FontCollection};
 use crate::graphics::{Color, Rect};
+use crate::settings::Config;
 use chrono::{NaiveDate, Timelike};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
 use std::collections::{BTreeSet, HashMap};
@@ -10,6 +11,7 @@ pub struct Dash {
     previous: Option<EpdImage>,
     calendar_handler: CalendarHandler,
     font_collection: FontCollection,
+    config: Config,
 }
 
 // TODO: I think there should be a better way for this
@@ -31,10 +33,11 @@ macro_rules! fast_create_text {
 }
 
 impl Dash {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
+            config: config.clone(),
             previous: None,
-            calendar_handler: CalendarHandler::new(),
+            calendar_handler: CalendarHandler::new(config.google.clone()),
             font_collection: FontCollection::new(),
         }
     }

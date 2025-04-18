@@ -1,0 +1,7 @@
+[google]
+token_path = ""
+client_id = ""
+client_secret = ""
+auth_uri = "https://accounts.google.com/o/oauth2/v2/auth"
+redirect_uri = "http://localhost:8080"
+token_uri = "https://www.googleapis.com/oauth2/v3/token"

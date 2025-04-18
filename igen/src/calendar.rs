@@ -26,11 +26,43 @@ impl CalendarHandler {
                 time: AllDay(chrono::Local::now().date_naive()),
             },
             Event {
+                title: "OOOOOOOOOOOOOOO".to_string(),
+                time: AllDay(
+                    chrono::Local::now()
+                        .add(chrono::TimeDelta::days(1))
+                        .date_naive(),
+                ),
+            },
+            Event {
+                title: "VVVVVVVVVVVVVVVVVVVVVV".to_string(),
+                time: AllDay(
+                    chrono::Local::now()
+                        .add(chrono::TimeDelta::days(1))
+                        .date_naive(),
+                ),
+            },
+            Event {
                 title: "Test Timed!".to_string(),
                 time: Timed(
                     chrono::Local::now()
                         .add(chrono::TimeDelta::days(2))
                         .with_timezone(&chrono::Utc),
+                    chrono::TimeDelta::minutes(63),
+                ),
+            },
+            Event {
+                title: "locking in..".to_string(),
+                time: Timed(
+                    chrono::Local::now().with_timezone(&chrono::Utc),
+                    chrono::TimeDelta::minutes(63),
+                ),
+            },
+            Event {
+                title: "crashing out..".to_string(),
+                time: Timed(
+                    chrono::Local::now()
+                        .with_timezone(&chrono::Utc)
+                        .add(chrono::TimeDelta::minutes(30)),
                     chrono::TimeDelta::minutes(63),
                 ),
             },

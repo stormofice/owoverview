@@ -23,6 +23,15 @@ impl Padding {
             right: pad,
         }
     }
+
+    pub fn new(top: usize, bottom: usize, left: usize, right: usize) -> Self {
+        Padding {
+            top,
+            bottom,
+            left,
+            right,
+        }
+    }
 }
 
 pub struct Offset {
@@ -161,7 +170,24 @@ impl Area {
         }
     }
 
-    pub fn auto_layout_text(
+    fn is_layout_possible(
+        &self,
+        font: &Font,
+        layout_settings: LayoutSettings,
+        texts: &[TextStyle],
+    ) -> bool {
+        let mut is_possible = true;
+        Self::layout_text(font, layout_settings, texts, |x, y, _| {
+            if (x >= (self.canvas.x + self.canvas.width)
+                || y >= (self.canvas.y + self.canvas.height))
+            {
+                is_possible = false;
+            }
+        });
+        is_possible
+    }
+
+    pub fn auto_layout_text_size(
         &mut self,
         font: &Font,
         layout_settings: LayoutSettings,
@@ -170,18 +196,6 @@ impl Area {
     ) {
         let mut current_text_size = 1f32;
 
-        let is_layout_possible = |texts: &[TextStyle]| -> bool {
-            let mut is_possible = true;
-            Self::layout_text(font, layout_settings, texts, |x, y, _| {
-                if (x >= (self.canvas.x + self.canvas.width)
-                    || y >= (self.canvas.y + self.canvas.height))
-                {
-                    is_possible = false;
-                }
-            });
-            is_possible
-        };
-
         let mut largest_text_styles: Vec<TextStyle> = vec![];
         loop {
             let mut text_styles: Vec<TextStyle> = vec![];
@@ -189,7 +203,7 @@ impl Area {
                 text_styles.push(TextStyle::new(ts.text, current_text_size, 0));
             }
 
-            if is_layout_possible(text_styles.as_slice()) {
+            if self.is_layout_possible(font, layout_settings, text_styles.as_slice()) {
                 current_text_size += 1f32;
                 largest_text_styles = text_styles;
             } else {
@@ -212,6 +226,9 @@ impl Area {
         texts: &[TextStyle],
         coverage_threshold: u8,
     ) {
+        if !self.is_layout_possible(font, layout_settings, texts) {
+            panic!("layouting impossible");
+        }
         Self::layout_text(font, layout_settings, texts, |x, y, coverage| {
             let color = if coverage > coverage_threshold {
                 PixelColor::Black
@@ -293,11 +310,11 @@ impl Area {
     }
 
     pub fn get_available_vspace(&self) -> usize {
-        self.canvas.height - self.get_vstart()
+        self.canvas.height
     }
 
     pub fn get_available_hspace(&self) -> usize {
-        self.canvas.width - self.get_hstart()
+        self.canvas.width
     }
 }
 

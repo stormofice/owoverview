@@ -35,8 +35,7 @@ impl FontCollection {
 
     pub fn load_font(&mut self, font: Font) -> fontdue::Font {
         if let std::collections::hash_map::Entry::Vacant(entry) = self.fonts.entry(font) {
-            self.fonts.insert(
-                font,
+            entry.insert(
                 fontdue::Font::from_bytes(Self::get_font_bytes(font), FontSettings::default())
                     .unwrap_or_else(|_| panic!("Could not load font: {:?}", font)),
             );

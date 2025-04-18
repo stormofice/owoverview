@@ -38,6 +38,17 @@ pub struct CalendarHandler {
     http_client: reqwest::blocking::Client,
 }
 
+#[derive(Debug, Deserialize)]
+struct CalendarListResponse {
+    items: Vec<CalendarListEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CalendarListEntry {
+    id: String,
+    summary: String,
+}
+
 macro_rules! create_oauth_client {
     ($self:expr) => {
         BasicClient::new(ClientId::new($self.google_config.client_id.clone()))
@@ -145,10 +156,8 @@ impl CalendarHandler {
     }
 
     fn load_or_refresh_token(&self) -> String {
-        const TOKEN_FILE: &str = ".token";
-
-        if Path::new(TOKEN_FILE).exists() {
-            let token_str = fs::read_to_string(TOKEN_FILE).expect("");
+        if Path::new(&self.google_config.token_path).exists() {
+            let token_str = fs::read_to_string(&self.google_config.token_path).expect("");
             let stored_token: StoredToken = serde_json::from_str(&token_str).expect("");
 
             let now = chrono::Utc::now();
@@ -167,12 +176,12 @@ impl CalendarHandler {
                         .exchange_refresh_token(&refresh_token)
                         .request(&self.http_client)
                         .expect("Could not exchange refresh token");
-                    Self::store_token(&token_response);
+                    self.store_token(&token_response);
                     token_response.access_token().secret().clone()
                 } else {
                     println!("No refresh token in file. Authenticating...");
                     let tok = self.authenticate();
-                    Self::store_token(&tok);
+                    self.store_token(&tok);
                     tok.access_token().secret().clone()
                 }
             } else {
@@ -182,12 +191,12 @@ impl CalendarHandler {
         } else {
             println!("no token file, authenticating");
             let tok = self.authenticate();
-            Self::store_token(&tok);
+            self.store_token(&tok);
             tok.access_token().secret().clone()
         }
     }
 
-    fn store_token(token_response: &BasicTokenResponse) {
+    fn store_token(&self, token_response: &BasicTokenResponse) {
         let stored_token = StoredToken {
             access_token: token_response.access_token().secret().to_string(),
             refresh_token: token_response
@@ -198,13 +207,36 @@ impl CalendarHandler {
                 .map(|d| chrono::Utc::now().add(d)),
         };
         fs::write(
-            Path::new(".token"),
+            Path::new(&self.google_config.token_path),
             serde_json::to_string_pretty(&stored_token).expect("Could not prettify token"),
         )
         .expect("Could not store token");
     }
 
+    pub fn retrieve_calendar_events(&self) {
+        const LIST_CALENDARS: &str = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
+
+        let calenders = self
+            .http_client
+            .get(LIST_CALENDARS)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {}", self.load_or_refresh_token()),
+            )
+            .send()
+            .expect("Could not send list calendar request");
+
+        let clr = calenders
+            .json::<CalendarListResponse>()
+            .expect("Could not deserialize calendars to json");
+
+        for cle in clr.items {
+            println!("{:?}", cle);
+        }
+    }
+
     pub fn fetch(&self) -> Vec<Event> {
+        self.retrieve_calendar_events();
         vec![
             Event {
                 title: "Test All Day!".to_string(),

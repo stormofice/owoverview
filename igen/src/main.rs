@@ -1,4 +1,5 @@
-use crate::calendar::CalendarHandler;
+#![allow(dead_code)]
+#![allow(clippy::needless_range_loop)]
 use crate::dash::Dash;
 
 mod calendar;

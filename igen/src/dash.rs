@@ -3,7 +3,7 @@ use crate::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::fonts::{Font, FontCollection};
 use crate::graphics::{Color, Rect};
 use crate::settings::Config;
-use chrono::{NaiveDate, Timelike};
+use chrono::NaiveDate;
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
 use std::collections::{BTreeSet, HashMap};
 
@@ -15,6 +15,7 @@ pub struct Dash {
 }
 
 // TODO: I think there should be a better way for this
+#[allow(unused_macros)]
 macro_rules! fast_create_text {
     ($font:expr, $area:ident, $layout_settings:expr, $styles:expr, $cover:expr) => {
         $area.auto_layout_text(
@@ -142,7 +143,7 @@ impl Dash {
 
                 let text = match event.time {
                     Time::AllDay(_) => &event.title,
-                    Time::Timed(dt, td) => &format!("{} {}", dt.format("%H:%M"), event.title),
+                    Time::Timed(dt, _) => &format!("{} {}", dt.format("%H:%M"), event.title),
                 };
 
                 event_area.try_put_text(

@@ -178,8 +178,8 @@ impl Area {
     ) -> bool {
         let mut is_possible = true;
         Self::layout_text(font, layout_settings, texts, |x, y, _| {
-            if (x >= (self.canvas.x + self.canvas.width)
-                || y >= (self.canvas.y + self.canvas.height))
+            if x >= (self.canvas.x + self.canvas.width)
+                || y >= (self.canvas.y + self.canvas.height)
             {
                 is_possible = false;
             }

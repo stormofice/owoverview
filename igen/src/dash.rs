@@ -1,14 +1,15 @@
 use crate::calendar::{CalendarHandler, Event, Time};
 use crate::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
+use crate::fonts::{Font, FontCollection};
 use crate::graphics::{Color, Rect};
 use chrono::{NaiveDate, Timelike};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
-use fontdue::{Font, FontSettings};
 use std::collections::{BTreeSet, HashMap};
 
 pub struct Dash {
     previous: Option<EpdImage>,
     calendar_handler: CalendarHandler,
+    font_collection: FontCollection,
 }
 
 // TODO: I think there should be a better way for this
@@ -34,18 +35,14 @@ impl Dash {
         Self {
             previous: None,
             calendar_handler: CalendarHandler::new(),
+            font_collection: FontCollection::new(),
         }
     }
 
-    fn create_calendar_day_grouped(&self, cal: &mut Area) {
-        // TODO: change font
-        let font_data = include_bytes!("../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8];
-        let font =
-            Font::from_bytes(font_data, FontSettings::default()).expect("Could not load font");
-
-        let title_font_data = include_bytes!("../assets/Space_Mono/SpaceMono-Bold.ttf") as &[u8];
-        let title_font = Font::from_bytes(title_font_data, FontSettings::default())
-            .expect("Could not load font");
+    fn create_calendar_day_grouped(&mut self, cal: &mut Area) {
+        // This should be possible without the clone, no?
+        let date_font = self.font_collection.load_font(Font::Wellfleet);
+        let title_font = self.font_collection.load_font(Font::Dina);
 
         let mut events_per_day: HashMap<NaiveDate, Vec<Event>> = HashMap::new();
         let mut dates: BTreeSet<NaiveDate> = BTreeSet::new();
@@ -103,7 +100,7 @@ impl Dash {
                 Outline::default(),
             );
             date_area.try_put_text(
-                &font,
+                &date_font,
                 LayoutSettings {
                     x: date_area.get_hstart() as f32,
                     y: date_area.get_vstart() as f32,
@@ -156,8 +153,8 @@ impl Dash {
                         vertical_align: VerticalAlign::Middle,
                         ..LayoutSettings::default()
                     },
-                    &[TextStyle::new(fit_title(text).as_str(), 17.0, 0)],
-                    90,
+                    &[TextStyle::new(fit_title(text).as_str(), 22.0, 0)],
+                    20,
                 );
                 cal.add_sub_area(event_area);
 
@@ -166,12 +163,10 @@ impl Dash {
         }
     }
 
-    fn create_dashboard(&self) -> EpdImage {
+    fn create_dashboard(&mut self) -> EpdImage {
         let mut image = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
 
-        let font_data = include_bytes!("../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8];
-        let font =
-            Font::from_bytes(font_data, FontSettings::default()).expect("Could not load font");
+        let font = self.font_collection.load_font(Font::Wellfleet);
 
         let mut total = Area::new(
             0,

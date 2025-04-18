@@ -4,6 +4,7 @@ use std::time::Duration;
 mod calendar;
 mod dash;
 mod epd;
+mod fonts;
 mod graphics;
 
 fn main() {

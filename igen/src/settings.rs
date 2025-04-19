@@ -8,6 +8,7 @@ pub struct GoogleConfig {
     pub auth_uri: String,
     pub redirect_uri: String,
     pub token_uri: String,
+    pub calendar_list: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

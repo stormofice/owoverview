@@ -76,7 +76,7 @@ impl Dash {
                 }
             });
 
-        const DAYS_SHOWN: usize = 2;
+        const DAYS_SHOWN: usize = 4;
         const EVENTS_PER_DAY: usize = 3;
         const DATE_EVENT_PADDING: usize = 2;
         const DATE_HEIGHT: usize = 32;

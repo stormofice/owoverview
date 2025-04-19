@@ -13,6 +13,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::ops::Add;
 use std::path::Path;
+use std::str::FromStr;
 
 #[derive(Debug)]
 pub enum Time {
@@ -36,6 +37,64 @@ struct StoredToken {
 pub struct CalendarHandler {
     google_config: GoogleConfig,
     http_client: reqwest::blocking::Client,
+    calendar_list: Option<CalendarListResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+struct EventsResponse {
+    items: Vec<GoogleEvent>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GoogleEvent {
+    id: String,
+    summary: String,
+    start: GoogleEventDateTime,
+    end: GoogleEventDateTime,
+}
+
+impl From<GoogleEvent> for Event {
+    fn from(value: GoogleEvent) -> Self {
+        // if there is a date, it is an all-day event
+        println!("{:?}", &value);
+        let time = if let Some(start_date) = value.start.date {
+            AllDay(chrono::NaiveDate::from_str(&start_date).expect("Could not parse date"))
+        } else {
+            let st = chrono::DateTime::parse_from_rfc3339(
+                value
+                    .start
+                    .date_time
+                    .expect("Timed Event must have start time")
+                    .as_str(),
+            )
+            .expect("Could not parse event start time")
+            .to_utc();
+            let et = chrono::DateTime::parse_from_rfc3339(
+                value
+                    .end
+                    .date_time
+                    .expect(
+                        "Timed \
+            Event must have end time",
+                    )
+                    .as_str(),
+            )
+            .expect("Could not parse event end time")
+            .to_utc();
+            Timed(st, et.signed_duration_since(st))
+        };
+        Event {
+            title: value.summary,
+            time,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct GoogleEventDateTime {
+    #[serde(default, rename(deserialize = "dateTime"))]
+    date_time: Option<String>,
+    date: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +135,7 @@ impl CalendarHandler {
                 .redirect(reqwest::redirect::Policy::none())
                 .build()
                 .expect("HTTP client could not be constructed"),
+            calendar_list: None,
         };
         cl.load_or_refresh_token();
         cl
@@ -213,7 +273,66 @@ impl CalendarHandler {
         .expect("Could not store token");
     }
 
-    pub fn retrieve_calendar_events(&self) {
+    fn retrieve_calendar_events(&mut self) -> Vec<Event> {
+        if self.calendar_list.is_none() {
+            self.fetch_calenders()
+        }
+
+        let clr = self.calendar_list.as_ref().expect("Calendar list unset");
+
+        let mut combined_events: Vec<Event> = vec![];
+
+        clr.items
+            .iter()
+            .filter(|cal| self.google_config.calendar_list.contains(&cal.summary))
+            .for_each(|cal| {
+                let id = &cal.id;
+                for event in self.fetch_events_for_calendar(id) {
+                    println!("{:?}", &event);
+                    combined_events.push(event);
+                }
+            });
+
+        combined_events
+    }
+
+    fn fetch_events_for_calendar(&self, cal_id: &str) -> Vec<Event> {
+        let events_url = format!(
+            "https://www.googleapis.com/calendar/v3/calendars/{}/events",
+            cal_id
+        );
+
+        let gevents = self
+            .http_client
+            .get(events_url)
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {}", self.load_or_refresh_token()),
+            )
+            .query(&[
+                (
+                    "timeMin",
+                    chrono::Local::now().to_utc().to_rfc3339().as_str(),
+                ),
+                ("singleEvents", "true"),
+                ("orderBy", "startTime"),
+                ("maxResults", "10"),
+            ])
+            .send()
+            .expect("Could not send list calendar request");
+
+        let gevents = gevents
+            .json::<EventsResponse>()
+            .unwrap_or_else(|_| panic!("Could not deserialize events response, cal: {}", cal_id));
+
+        let mut events: Vec<Event> = vec![];
+        for gevent in gevents.items {
+            events.push(Event::from(gevent));
+        }
+        events
+    }
+
+    fn fetch_calenders(&mut self) {
         const LIST_CALENDARS: &str = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
 
         let calenders = self
@@ -229,60 +348,10 @@ impl CalendarHandler {
         let clr = calenders
             .json::<CalendarListResponse>()
             .expect("Could not deserialize calendars to json");
-
-        for cle in clr.items {
-            println!("{:?}", cle);
-        }
+        self.calendar_list = Some(clr)
     }
 
-    pub fn fetch(&self) -> Vec<Event> {
-        self.retrieve_calendar_events();
-        vec![
-            Event {
-                title: "Test All Day!".to_string(),
-                time: AllDay(chrono::Local::now().date_naive()),
-            },
-            Event {
-                title: "OOOOOOOOOOOOOOO".to_string(),
-                time: AllDay(
-                    chrono::Local::now()
-                        .add(chrono::TimeDelta::days(1))
-                        .date_naive(),
-                ),
-            },
-            Event {
-                title: "VVVVVVVVVVVVVVVVVVVVVV".to_string(),
-                time: AllDay(
-                    chrono::Local::now()
-                        .add(chrono::TimeDelta::days(1))
-                        .date_naive(),
-                ),
-            },
-            Event {
-                title: "Test Timed!".to_string(),
-                time: Timed(
-                    chrono::Local::now()
-                        .add(chrono::TimeDelta::days(2))
-                        .with_timezone(&chrono::Utc),
-                    chrono::TimeDelta::minutes(63),
-                ),
-            },
-            Event {
-                title: "locking in..".to_string(),
-                time: Timed(
-                    chrono::Local::now().with_timezone(&chrono::Utc),
-                    chrono::TimeDelta::minutes(63),
-                ),
-            },
-            Event {
-                title: "crashing out..".to_string(),
-                time: Timed(
-                    chrono::Local::now()
-                        .with_timezone(&chrono::Utc)
-                        .add(chrono::TimeDelta::minutes(30)),
-                    chrono::TimeDelta::minutes(63),
-                ),
-            },
-        ]
+    pub fn fetch(&mut self) -> Vec<Event> {
+        self.retrieve_calendar_events()
     }
 }

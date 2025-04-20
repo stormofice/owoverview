@@ -4,11 +4,11 @@
 use crate::dash::Dash;
 use log::debug;
 
-mod calendar;
 mod dash;
 mod epd;
 mod fonts;
 mod graphics;
+mod provider;
 mod settings;
 
 fn main() {

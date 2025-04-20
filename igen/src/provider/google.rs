@@ -1,4 +1,4 @@
-use crate::calendar::Time::{AllDay, Timed};
+use crate::provider::google::Time::{AllDay, Timed};
 use crate::settings::GoogleConfig;
 use std::cmp::Ordering;
 
@@ -47,7 +47,7 @@ impl Ord for Time {
             (AllDay(f), AllDay(s)) => f.cmp(s),
             (Timed(f, _), Timed(s, _)) => f.cmp(s),
             // "AllDays" are always before timed events
-            (AllDay(date1), Time::Timed(start2, _)) => {
+            (AllDay(date1), Timed(start2, _)) => {
                 let date2 = start2.date_naive();
                 match date1.cmp(&date2) {
                     Ordering::Equal => Ordering::Less,
@@ -184,7 +184,7 @@ impl CalendarHandler {
 
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
 
-        let (authorize_url, csrf_state) = client
+        let (authorize_url, _) = client
             .authorize_url(CsrfToken::new_random)
             .add_scope(Scope::new(
                 "https://www.googleapis.com/auth/calendar".to_string(),
@@ -194,7 +194,7 @@ impl CalendarHandler {
 
         println!("Open this URL in your browser:\n{authorize_url}\n");
 
-        let (code, state) = {
+        let (code, _) = {
             // A very naive implementation of the redirect server.
             let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
 

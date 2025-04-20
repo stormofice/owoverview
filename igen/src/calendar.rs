@@ -1,6 +1,8 @@
 use crate::calendar::Time::{AllDay, Timed};
 use crate::settings::GoogleConfig;
+use std::cmp::Ordering;
 
+use log::{debug, warn};
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
@@ -18,7 +20,49 @@ use std::str::FromStr;
 #[derive(Debug)]
 pub enum Time {
     AllDay(chrono::NaiveDate),
-    Timed(chrono::DateTime<chrono::Utc>, chrono::TimeDelta),
+    Timed(chrono::DateTime<chrono::Local>, chrono::TimeDelta),
+}
+
+impl PartialEq for Time {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (AllDay(f), AllDay(s)) => f == s,
+            (Timed(f, df), Timed(s, ds)) => f == s && df == ds,
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for Time {}
+
+impl PartialOrd for Time {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Time {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (AllDay(f), AllDay(s)) => f.cmp(s),
+            (Timed(f, _), Timed(s, _)) => f.cmp(s),
+            // "AllDays" are always before timed events
+            (AllDay(date1), Time::Timed(start2, _)) => {
+                let date2 = start2.date_naive();
+                match date1.cmp(&date2) {
+                    Ordering::Equal => Ordering::Less,
+                    ordering => ordering,
+                }
+            }
+            (Timed(start1, _), AllDay(date2)) => {
+                let date1 = start1.date_naive();
+                match date1.cmp(date2) {
+                    Ordering::Equal => Ordering::Greater,
+                    ordering => ordering,
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -56,7 +100,6 @@ struct GoogleEvent {
 impl From<GoogleEvent> for Event {
     fn from(value: GoogleEvent) -> Self {
         // if there is a date, it is an all-day event
-        println!("{:?}", &value);
         let time = if let Some(start_date) = value.start.date {
             AllDay(chrono::NaiveDate::from_str(&start_date).expect("Could not parse date"))
         } else {
@@ -67,21 +110,16 @@ impl From<GoogleEvent> for Event {
                     .expect("Timed Event must have start time")
                     .as_str(),
             )
-            .expect("Could not parse event start time")
-            .to_utc();
+            .expect("Could not parse event start time");
             let et = chrono::DateTime::parse_from_rfc3339(
                 value
                     .end
                     .date_time
-                    .expect(
-                        "Timed \
-            Event must have end time",
-                    )
+                    .expect("Timed Event must have end time")
                     .as_str(),
             )
-            .expect("Could not parse event end time")
-            .to_utc();
-            Timed(st, et.signed_duration_since(st))
+            .expect("Could not parse event end time");
+            Timed(chrono::DateTime::from(st), et.signed_duration_since(st))
         };
         Event {
             title: value.summary,
@@ -185,7 +223,7 @@ impl CalendarHandler {
                 .map(|(_, state)| CsrfToken::new(state.into_owned()))
                 .unwrap();
 
-            let message = "Go back to your terminal :)";
+            let message = "Authentication successful. You can safely go back to your terminal :^)";
             let response = format!(
                 "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
                 message.len(),
@@ -196,23 +234,12 @@ impl CalendarHandler {
             (code, state)
         };
 
-        println!("Google returned the following code:\n{}\n", code.secret());
-        println!(
-            "Google returned the following state:\n{} (expected `{}`)\n",
-            state.secret(),
-            csrf_state.secret()
-        );
-
         // Exchange the code with a token.
-        let token_response = client
+        client
             .exchange_code(code)
             .set_pkce_verifier(pkce_code_verifier)
             .request(&self.http_client)
-            .expect("Could not get token response");
-
-        println!("Google returned the following token:\n{token_response:?}\n");
-
-        token_response
+            .expect("Could not get token response")
     }
 
     fn load_or_refresh_token(&self) -> String {
@@ -228,7 +255,7 @@ impl CalendarHandler {
 
             if is_expired {
                 if let Some(refresh_token_str) = stored_token.refresh_token {
-                    println!("Access token expired. Refreshing...");
+                    debug!("Access token expired. Refreshing...");
 
                     let refresh_token = RefreshToken::new(refresh_token_str);
                     let oauth_client = create_oauth_client!(self);
@@ -239,17 +266,17 @@ impl CalendarHandler {
                     self.store_token(&token_response);
                     token_response.access_token().secret().clone()
                 } else {
-                    println!("No refresh token in file. Authenticating...");
+                    warn!("No refresh token in file. Authenticating...");
                     let tok = self.authenticate();
                     self.store_token(&tok);
                     tok.access_token().secret().clone()
                 }
             } else {
-                println!("Using existing token");
+                debug!("Using existing token");
                 stored_token.access_token
             }
         } else {
-            println!("no token file, authenticating");
+            debug!("Found no token file, authenticating");
             let tok = self.authenticate();
             self.store_token(&tok);
             tok.access_token().secret().clone()
@@ -288,10 +315,11 @@ impl CalendarHandler {
             .for_each(|cal| {
                 let id = &cal.id;
                 for event in self.fetch_events_for_calendar(id) {
-                    println!("{:?}", &event);
                     combined_events.push(event);
                 }
             });
+
+        combined_events.sort_by(|f, s| f.time.cmp(&s.time));
 
         combined_events
     }

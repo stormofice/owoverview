@@ -178,8 +178,7 @@ impl Area {
     ) -> bool {
         let mut is_possible = true;
         Self::layout_text(font, layout_settings, texts, |x, y, _| {
-            if x >= (self.canvas.x + self.canvas.width)
-                || y >= (self.canvas.y + self.canvas.height)
+            if x >= (self.canvas.x + self.canvas.width) || y >= (self.canvas.y + self.canvas.height)
             {
                 is_possible = false;
             }
@@ -369,9 +368,6 @@ impl EpdImage {
                 }
             }
         }
-
-        let any_1 = partial.iter().find(|x| x.count_ones() > 0);
-        println!("{any_1:?}");
 
         let mut file = std::fs::File::create(filename).unwrap();
         file.write_all(&partial)

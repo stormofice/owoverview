@@ -5,6 +5,7 @@ use crate::graphics::{Color, Rect};
 use crate::settings::Config;
 use chrono::NaiveDate;
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
+use log::debug;
 use std::collections::{BTreeSet, HashMap};
 
 pub struct Dash {
@@ -93,7 +94,14 @@ impl Dash {
 
         let mut cur_y = cal.get_vstart();
 
-        for date in dates.iter().take(DAYS_SHOWN) {
+        for date in dates {
+            // Take until we can still fit a date + event
+            if (cur_y + DATE_HEIGHT + DATE_EVENT_PADDING + EVENT_HEIGHT)
+                >= cal.get_available_vspace()
+            {
+                break;
+            }
+
             let mut date_area = Area::new(
                 0,
                 cur_y,
@@ -126,7 +134,7 @@ impl Dash {
             cur_y += DATE_HEIGHT + DATE_EVENT_PADDING;
 
             for event in events_per_day
-                .get(date)
+                .get(&date)
                 .unwrap()
                 .iter()
                 .take(EVENTS_PER_DAY)
@@ -221,6 +229,8 @@ impl Dash {
         quote_area.auto_layout_text_size(
             &font,
             LayoutSettings {
+                x: quote_area.get_hstart() as f32,
+                y: quote_area.get_vstart() as f32,
                 max_height: Some(quote_area.get_available_vspace() as f32),
                 max_width: Some(quote_area.get_available_hspace() as f32),
                 ..LayoutSettings::default()
@@ -344,7 +354,7 @@ impl Dash {
         let current = self.create_dashboard();
 
         if let Some(bbox) = self.get_change_bbox(&current) {
-            println!("change bbox: {:?}", bbox);
+            debug!("change bbox: {:?}", bbox);
         }
 
         current.to_img_file("output.png");

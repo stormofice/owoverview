@@ -8,6 +8,8 @@ pub struct Rect {
 
 impl Rect {
     pub fn set_px(&self, buf: &mut [Vec<PixelColor>], x: usize, y: usize, color: PixelColor) {
+        // TODO: Well, this correct looking assert fails; should be investigated someday
+        // assert!(x <= self.width && y <= self.height);
         buf[self.y + y][self.x + x] = color;
     }
 

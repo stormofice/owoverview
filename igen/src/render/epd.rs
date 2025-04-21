@@ -1,7 +1,7 @@
 use crate::render::graphics::{Color, PixelColor, Rect};
 use fontdue::Font;
 use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
-use image::{GenericImageView, Luma, Pixel};
+use image::{DynamicImage, GenericImageView, Luma, Pixel};
 use std::io::Write;
 
 pub const EPD_WIDTH: usize = 800;
@@ -274,6 +274,41 @@ impl Area {
         }
     }
 
+    pub fn load_image(&mut self, x: usize, y: usize, image: &DynamicImage) {
+        println!(
+            "{} {}",
+            self.get_available_hspace(),
+            self.get_available_vspace()
+        );
+        if (image.width() > self.get_available_hspace() as u32)
+            || (image.height() > self.get_available_vspace() as u32)
+        {
+            panic!("Image is too large");
+        }
+        let offset_x = x;
+        let offset_y = y;
+
+        for y in 0..image.height() {
+            for x in 0..image.width() {
+                let pixel = image.get_pixel(x, y);
+                let rgb = pixel.to_rgb();
+
+                let avg = (rgb[0] as u32 + rgb[1] as u32 + rgb[2] as u32) / 3;
+                let color = if avg > 127 {
+                    PixelColor::White
+                } else {
+                    PixelColor::Black
+                };
+                self.canvas.set_px(
+                    &mut self.buf,
+                    (x as usize + offset_x),
+                    (y as usize + offset_y),
+                    color,
+                );
+            }
+        }
+    }
+
     pub fn add_sub_area(&mut self, mut area: Area) {
         area.offset.x += self.offset.x + self.canvas.x;
         area.offset.y += self.offset.y + self.canvas.y;
@@ -393,30 +428,5 @@ impl EpdImage {
             }
         }
         image.save(filename).expect("Could not save image")
-    }
-
-    pub fn load_image(&mut self, filename: &str) {
-        let img = image::open(filename).expect("Failed to load image");
-        if (img.width() > EPD_WIDTH as u32) || (img.height() > EPD_HEIGHT as u32) {
-            panic!("Image is too large");
-        }
-        // center
-        let offset_x = (EPD_WIDTH as u32 - img.width()) / 2;
-        let offset_y = (EPD_HEIGHT as u32 - img.height()) / 2;
-
-        for y in 0..img.height() {
-            for x in 0..img.width() {
-                let pixel = img.get_pixel(x, y);
-                let rgb = pixel.to_rgb();
-
-                let avg = (rgb[0] as u32 + rgb[1] as u32 + rgb[2] as u32) / 3;
-                let color = if avg > 127 {
-                    PixelColor::White
-                } else {
-                    PixelColor::Black
-                };
-                self.set_pixel((x + offset_x) as usize, (y + offset_y) as usize, color);
-            }
-        }
     }
 }

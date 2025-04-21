@@ -1,4 +1,5 @@
 use crate::provider::google::{CalendarProvider, Event, Time};
+use crate::provider::image::ImageProvider;
 use crate::provider::quote::QuoteProvider;
 use crate::render::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::render::fonts::{Font, FontCollection};
@@ -6,6 +7,7 @@ use crate::render::graphics::{Color, Rect};
 use crate::settings::Config;
 use chrono::NaiveDate;
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
+use image::imageops;
 use log::debug;
 use std::collections::{BTreeSet, HashMap};
 
@@ -13,6 +15,7 @@ pub struct Dash {
     previous_frame: Option<EpdImage>,
     calendar_provider: CalendarProvider,
     quote_provider: QuoteProvider,
+    image_provider: ImageProvider,
     font_collection: FontCollection,
     config: Config,
 }
@@ -43,6 +46,7 @@ impl Dash {
             previous_frame: None,
             calendar_provider: CalendarProvider::new(config.google.clone()),
             quote_provider: QuoteProvider::new(config.quote.clone()),
+            image_provider: ImageProvider::new(config.clone()),
             font_collection: FontCollection::new(),
         }
     }
@@ -196,6 +200,19 @@ impl Dash {
         );
     }
 
+    fn create_image(&mut self, image_area: &mut Area) {
+        let image = self.image_provider.get_image();
+        let resized = image.resize(
+            image_area.get_available_hspace() as u32,
+            image_area.get_available_vspace() as u32,
+            imageops::FilterType::Nearest,
+        );
+        let x_off = (image_area.get_available_hspace() - resized.width() as usize) / 2;
+        let y_off = (image_area.get_available_vspace() - resized.height() as usize) / 2;
+
+        image_area.load_image(x_off, y_off, &resized);
+    }
+
     fn create_dashboard(&mut self) -> EpdImage {
         let mut image = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
 
@@ -237,12 +254,12 @@ impl Dash {
             right_column.get_available_hspace(),
             140,
             Color::White,
-            Padding::full(4),
+            Padding::full(2),
             Outline {
-                right: 2,
-                bottom: 2,
-                left: 0, // borders right column
-                top: 2,
+                right: 0,
+                bottom: 0,
+                left: 0, // borders left column
+                top: 1,
                 color: Color::Black,
             },
         );
@@ -256,8 +273,26 @@ impl Dash {
             right_column.get_available_vspace() - quote_area.space.height,
             Color::White,
             Padding::full(0),
-            Outline::default(),
+            Outline {
+                color: Color::Black,
+                bottom: 0,
+                top: 0,
+                left: 1,
+                right: 0,
+            },
         );
+
+        let mut image_area = Area::new(
+            0,
+            0,
+            right_column.get_available_hspace() - misc_column.space.width,
+            right_column.get_available_vspace() - quote_area.space.height,
+            Color::Gray,
+            Padding::full(0),
+            Outline::none(),
+        );
+        self.create_image(&mut image_area);
+        right_column.add_sub_area(image_area);
 
         let now = chrono::Local::now();
         let now_str = now.format("%H:%M").to_string();

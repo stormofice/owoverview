@@ -17,7 +17,19 @@ pub struct QuoteConfig {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct ImageConfig {
+    pub images_path: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GeneralConfig {
+    pub debug: bool,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
+    pub general: GeneralConfig,
     pub google: GoogleConfig,
     pub quote: QuoteConfig,
+    pub image: ImageConfig,
 }

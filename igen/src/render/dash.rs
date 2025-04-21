@@ -1,7 +1,7 @@
-use crate::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
-use crate::fonts::{Font, FontCollection};
-use crate::graphics::{Color, Rect};
 use crate::provider::google::{CalendarHandler, Event, Time};
+use crate::render::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
+use crate::render::fonts::{Font, FontCollection};
+use crate::render::graphics::{Color, Rect};
 use crate::settings::Config;
 use chrono::NaiveDate;
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};

@@ -1,4 +1,4 @@
-use crate::graphics::{Color, PixelColor, Rect};
+use crate::render::graphics::{Color, PixelColor, Rect};
 use fontdue::Font;
 use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
 use image::{GenericImageView, Luma, Pixel};

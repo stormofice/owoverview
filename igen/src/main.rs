@@ -1,14 +1,11 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_range_loop)]
 
-use crate::dash::Dash;
 use log::debug;
+use render::dash::Dash;
 
-mod dash;
-mod epd;
-mod fonts;
-mod graphics;
 mod provider;
+mod render;
 mod settings;
 
 fn main() {

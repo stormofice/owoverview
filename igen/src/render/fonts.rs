@@ -21,14 +21,14 @@ impl FontCollection {
 
     const fn get_font_bytes(font: Font) -> &'static [u8] {
         match font {
-            Font::Dina => include_bytes!("../assets/Dina/DinaRemasterII-01.ttf") as &[u8],
+            Font::Dina => include_bytes!("../../assets/Dina/DinaRemasterII-01.ttf") as &[u8],
 
             Font::DinaBold => {
-                include_bytes!("../assets/Dina/DinaRemasterII-Bold-02.ttf") as &[u8]
+                include_bytes!("../../assets/Dina/DinaRemasterII-Bold-02.ttf") as &[u8]
             }
 
             Font::Wellfleet => {
-                include_bytes!("../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8]
+                include_bytes!("../../assets/Wellfleet/Wellfleet-Regular.ttf") as &[u8]
             }
         }
     }

@@ -27,7 +27,7 @@ impl Dash {
         Self {
             config: config.clone(),
             previous_frame: None,
-            calendar_provider: CalendarProvider::new(config.google.clone()),
+            calendar_provider: CalendarProvider::new(config.clone()),
             quote_provider: QuoteProvider::new(config.quote.clone()),
             image_provider: ImageProvider::new(config.clone()),
             weather_provider: WeatherProvider::new(config.clone()),

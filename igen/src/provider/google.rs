@@ -1,5 +1,5 @@
 use crate::provider::google::Time::{AllDay, Timed};
-use crate::settings::GoogleConfig;
+use crate::settings::{Config, GoogleConfig};
 use std::cmp::Ordering;
 
 use log::{debug, warn};
@@ -79,7 +79,7 @@ struct StoredToken {
 }
 
 pub struct CalendarProvider {
-    google_config: GoogleConfig,
+    config: Config,
     http_client: reqwest::blocking::Client,
     calendar_list: Option<CalendarListResponse>,
 }
@@ -148,27 +148,27 @@ struct CalendarListEntry {
 
 macro_rules! create_oauth_client {
     ($self:expr) => {
-        BasicClient::new(ClientId::new($self.google_config.client_id.clone()))
-            .set_client_secret(ClientSecret::new($self.google_config.client_secret.clone()))
+        BasicClient::new(ClientId::new($self.config.google.client_id.clone()))
+            .set_client_secret(ClientSecret::new($self.config.google.client_secret.clone()))
             .set_auth_uri(
-                AuthUrl::new($self.google_config.auth_uri.clone())
+                AuthUrl::new($self.config.google.auth_uri.clone())
                     .expect("Could not construct auth uri"),
             )
             .set_redirect_uri(
-                RedirectUrl::new($self.google_config.redirect_uri.clone())
+                RedirectUrl::new($self.config.google.redirect_uri.clone())
                     .expect("Could not construct redirect uri"),
             )
             .set_token_uri(
-                TokenUrl::new($self.google_config.token_uri.clone())
+                TokenUrl::new($self.config.google.token_uri.clone())
                     .expect("Could not construct token uri"),
             )
     };
 }
 
 impl CalendarProvider {
-    pub fn new(google_config: GoogleConfig) -> Self {
+    pub fn new(config: Config) -> Self {
         let cl = CalendarProvider {
-            google_config,
+            config,
             http_client: reqwest::blocking::ClientBuilder::new()
                 .redirect(reqwest::redirect::Policy::none())
                 .build()
@@ -243,8 +243,8 @@ impl CalendarProvider {
     }
 
     fn load_or_refresh_token(&self) -> String {
-        if Path::new(&self.google_config.token_path).exists() {
-            let token_str = fs::read_to_string(&self.google_config.token_path).expect("");
+        if Path::new(&self.config.google.token_path).exists() {
+            let token_str = fs::read_to_string(&self.config.google.token_path).expect("");
             let stored_token: StoredToken = serde_json::from_str(&token_str).expect("");
 
             let now = chrono::Utc::now();
@@ -294,7 +294,7 @@ impl CalendarProvider {
                 .map(|d| chrono::Utc::now().add(d)),
         };
         fs::write(
-            Path::new(&self.google_config.token_path),
+            Path::new(&self.config.google.token_path),
             serde_json::to_string_pretty(&stored_token).expect("Could not prettify token"),
         )
         .expect("Could not store token");
@@ -311,7 +311,7 @@ impl CalendarProvider {
 
         clr.items
             .iter()
-            .filter(|cal| self.google_config.calendar_list.contains(&cal.summary))
+            .filter(|cal| self.config.google.calendar_list.contains(&cal.summary))
             .for_each(|cal| {
                 let id = &cal.id;
                 for event in self.fetch_events_for_calendar(id) {
@@ -380,6 +380,13 @@ impl CalendarProvider {
     }
 
     pub fn fetch(&mut self) -> Vec<Event> {
-        self.retrieve_calendar_events()
+        if self.config.general.debug {
+            vec![Event {
+                time: AllDay(chrono::Local::now().date_naive()),
+                title: "hehe".to_string(),
+            }]
+        } else {
+            self.retrieve_calendar_events()
+        }
     }
 }

@@ -22,6 +22,13 @@ pub struct ImageConfig {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub struct WeatherConfig {
+    pub latitude: String,
+    pub longitude: String,
+    pub timezone: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct GeneralConfig {
     pub debug: bool,
 }
@@ -32,4 +39,5 @@ pub struct Config {
     pub google: GoogleConfig,
     pub quote: QuoteConfig,
     pub image: ImageConfig,
+    pub weather: WeatherConfig,
 }

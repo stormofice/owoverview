@@ -15,3 +15,8 @@ quotes_path = "./quotes.json"
 
 [image]
 images_path = "./images.json"
+
+[weather]
+latitude = "12.12"
+longitude = "14.14"
+timezone = "Europe/Berlin"

@@ -1,6 +1,7 @@
 use crate::provider::google::{CalendarProvider, Event, Time};
 use crate::provider::image::ImageProvider;
 use crate::provider::quote::QuoteProvider;
+use crate::provider::weather::WeatherProvider;
 use crate::render::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::render::fonts::{Font, FontCollection};
 use crate::render::graphics::{Color, Rect};
@@ -16,27 +17,9 @@ pub struct Dash {
     calendar_provider: CalendarProvider,
     quote_provider: QuoteProvider,
     image_provider: ImageProvider,
+    weather_provider: WeatherProvider,
     font_collection: FontCollection,
     config: Config,
-}
-
-// TODO: I think there should be a better way for this
-#[allow(unused_macros)]
-macro_rules! fast_create_text {
-    ($font:expr, $area:ident, $layout_settings:expr, $styles:expr, $cover:expr) => {
-        $area.auto_layout_text(
-            $font,
-            LayoutSettings {
-                x: $area.get_hstart() as f32,
-                y: $area.get_vstart() as f32,
-                max_width: Some($area.get_available_hspace() as f32),
-                max_height: Some($area.get_available_vspace() as f32),
-                ..$layout_settings
-            },
-            $styles,
-            $cover,
-        );
-    };
 }
 
 impl Dash {
@@ -47,6 +30,7 @@ impl Dash {
             calendar_provider: CalendarProvider::new(config.google.clone()),
             quote_provider: QuoteProvider::new(config.quote.clone()),
             image_provider: ImageProvider::new(config.clone()),
+            weather_provider: WeatherProvider::new(config.clone()),
             font_collection: FontCollection::new(),
         }
     }
@@ -84,8 +68,6 @@ impl Dash {
                 }
             });
 
-        const DAYS_SHOWN: usize = 4;
-        const EVENTS_PER_DAY: usize = 3;
         const DATE_EVENT_PADDING: usize = 2;
         const DATE_HEIGHT: usize = 32;
         const EVENT_HEIGHT: usize = 24;
@@ -140,12 +122,11 @@ impl Dash {
 
             cur_y += DATE_HEIGHT + DATE_EVENT_PADDING;
 
-            for event in events_per_day
-                .get(&date)
-                .unwrap()
-                .iter()
-                .take(EVENTS_PER_DAY)
-            {
+            for event in events_per_day.get(&date).unwrap().iter() {
+                if (cur_y + EVENT_HEIGHT) >= cal.get_available_vspace() {
+                    break;
+                }
+
                 let mut event_area = Area::new(
                     0,
                     cur_y,
@@ -211,6 +192,10 @@ impl Dash {
         let y_off = (image_area.get_available_vspace() - resized.height() as usize) / 2;
 
         image_area.load_image(x_off, y_off, &resized);
+    }
+
+    fn create_weather(&mut self, weather_area: &mut Area) {
+        self.weather_provider.check_sky();
     }
 
     fn create_dashboard(&mut self) -> EpdImage {
@@ -287,7 +272,7 @@ impl Dash {
             0,
             right_column.get_available_hspace() - misc_column.space.width,
             right_column.get_available_vspace() - quote_area.space.height,
-            Color::Gray,
+            Color::White,
             Padding::full(0),
             Outline::none(),
         );
@@ -328,7 +313,7 @@ impl Dash {
         );
         self.create_calendar_day_grouped(&mut calendar_area);
 
-        let weather_area = Area::new(
+        let mut weather_area = Area::new(
             0,
             left_column.get_available_vspace() / 2,
             left_column.get_available_hspace(),
@@ -343,6 +328,7 @@ impl Dash {
                 color: Color::Black,
             },
         );
+        self.create_weather(&mut weather_area);
 
         left_column.add_sub_area(calendar_area);
         left_column.add_sub_area(weather_area);

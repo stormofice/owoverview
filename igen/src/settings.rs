@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct GoogleConfig {
     pub token_path: String,
     pub client_id: String,
@@ -11,7 +11,13 @@ pub struct GoogleConfig {
     pub calendar_list: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
+pub struct QuoteConfig {
+    pub quotes_path: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub google: GoogleConfig,
+    pub quote: QuoteConfig,
 }

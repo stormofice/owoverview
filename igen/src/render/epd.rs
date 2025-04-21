@@ -192,6 +192,7 @@ impl Area {
         layout_settings: LayoutSettings,
         texts: &[TextStyle],
         coverage_threshold: u8,
+        max_text_size: f32,
     ) {
         let mut current_text_size = 1f32;
 
@@ -202,7 +203,9 @@ impl Area {
                 text_styles.push(TextStyle::new(ts.text, current_text_size, 0));
             }
 
-            if self.is_layout_possible(font, layout_settings, text_styles.as_slice()) {
+            if self.is_layout_possible(font, layout_settings, text_styles.as_slice())
+                && current_text_size <= max_text_size
+            {
                 current_text_size += 1f32;
                 largest_text_styles = text_styles;
             } else {

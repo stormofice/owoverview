@@ -78,7 +78,7 @@ struct StoredToken {
     expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-pub struct CalendarHandler {
+pub struct CalendarProvider {
     google_config: GoogleConfig,
     http_client: reqwest::blocking::Client,
     calendar_list: Option<CalendarListResponse>,
@@ -165,9 +165,9 @@ macro_rules! create_oauth_client {
     };
 }
 
-impl CalendarHandler {
+impl CalendarProvider {
     pub fn new(google_config: GoogleConfig) -> Self {
-        let cl = CalendarHandler {
+        let cl = CalendarProvider {
             google_config,
             http_client: reqwest::blocking::ClientBuilder::new()
                 .redirect(reqwest::redirect::Policy::none())

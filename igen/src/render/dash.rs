@@ -1,4 +1,5 @@
-use crate::provider::google::{CalendarHandler, Event, Time};
+use crate::provider::google::{CalendarProvider, Event, Time};
+use crate::provider::quote::QuoteProvider;
 use crate::render::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::render::fonts::{Font, FontCollection};
 use crate::render::graphics::{Color, Rect};
@@ -9,8 +10,9 @@ use log::debug;
 use std::collections::{BTreeSet, HashMap};
 
 pub struct Dash {
-    previous: Option<EpdImage>,
-    calendar_handler: CalendarHandler,
+    previous_frame: Option<EpdImage>,
+    calendar_provider: CalendarProvider,
+    quote_provider: QuoteProvider,
     font_collection: FontCollection,
     config: Config,
 }
@@ -38,8 +40,9 @@ impl Dash {
     pub fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
-            previous: None,
-            calendar_handler: CalendarHandler::new(config.google.clone()),
+            previous_frame: None,
+            calendar_provider: CalendarProvider::new(config.google.clone()),
+            quote_provider: QuoteProvider::new(config.quote.clone()),
             font_collection: FontCollection::new(),
         }
     }
@@ -51,7 +54,7 @@ impl Dash {
 
         let mut events_per_day: HashMap<NaiveDate, Vec<Event>> = HashMap::new();
         let mut dates: BTreeSet<NaiveDate> = BTreeSet::new();
-        self.calendar_handler
+        self.calendar_provider
             .fetch()
             .into_iter()
             .for_each(|e| match e.time {
@@ -175,6 +178,24 @@ impl Dash {
         }
     }
 
+    fn create_quote(&mut self, quote_area: &mut Area) {
+        let quote = self.quote_provider.get_quote();
+
+        quote_area.auto_layout_text_size(
+            &self.font_collection.load_font(Font::Wellfleet),
+            LayoutSettings {
+                x: quote_area.get_hstart() as f32,
+                y: quote_area.get_vstart() as f32,
+                max_height: Some(quote_area.get_available_vspace() as f32),
+                max_width: Some(quote_area.get_available_hspace() as f32),
+                ..LayoutSettings::default()
+            },
+            &[TextStyle::new(&quote.content, 1f32, 0)],
+            100,
+            30f32,
+        );
+    }
+
     fn create_dashboard(&mut self) -> EpdImage {
         let mut image = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
 
@@ -226,23 +247,7 @@ impl Dash {
             },
         );
 
-        quote_area.auto_layout_text_size(
-            &font,
-            LayoutSettings {
-                x: quote_area.get_hstart() as f32,
-                y: quote_area.get_vstart() as f32,
-                max_height: Some(quote_area.get_available_vspace() as f32),
-                max_width: Some(quote_area.get_available_hspace() as f32),
-                ..LayoutSettings::default()
-            },
-            &[TextStyle::new(
-                "Do not worry if you have built your castles in the air. They are where \
-                    they should be. Now put the foundations under them.",
-                20f32,
-                0,
-            )],
-            100,
-        );
+        self.create_quote(&mut quote_area);
 
         let mut misc_column = Area::new(
             right_column.get_available_hspace() - 100,
@@ -316,7 +321,7 @@ impl Dash {
     }
 
     fn get_change_bbox(&self, current: &EpdImage) -> Option<Rect> {
-        if let Some(previous) = &self.previous {
+        if let Some(previous) = &self.previous_frame {
             let mut xmin = EPD_WIDTH;
             let mut ymin = EPD_HEIGHT;
             let mut xmax = 0;
@@ -360,6 +365,6 @@ impl Dash {
         current.to_img_file("output.png");
         current.to_file("output.bin");
 
-        self.previous = Some(current)
+        self.previous_frame = Some(current)
     }
 }

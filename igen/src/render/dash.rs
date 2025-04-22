@@ -1,16 +1,17 @@
 use crate::provider::google::{CalendarProvider, Event, Time};
 use crate::provider::image::ImageProvider;
 use crate::provider::quote::QuoteProvider;
-use crate::provider::weather::WeatherProvider;
+use crate::provider::weather::{NiceCurrent, WeatherProvider, wmo_weather_code_to_str};
 use crate::render::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::render::fonts::{Font, FontCollection};
 use crate::render::graphics::{Color, Rect};
 use crate::settings::Config;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, TimeDelta};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
 use image::imageops;
 use log::debug;
 use std::collections::{BTreeSet, HashMap};
+use std::ops::Add;
 
 pub struct Dash {
     previous_frame: Option<EpdImage>,
@@ -100,7 +101,7 @@ impl Dash {
                 Padding::full(0),
                 Outline::default(),
             );
-            date_area.try_put_text(
+            date_area.put_text(
                 &date_font,
                 LayoutSettings {
                     x: date_area.get_hstart() as f32,
@@ -142,7 +143,7 @@ impl Dash {
                     Time::Timed(dt, _) => &format!("{} {}", dt.format("%H:%M"), event.title),
                 };
 
-                event_area.try_put_text(
+                event_area.put_text(
                     &title_font,
                     LayoutSettings {
                         x: event_area.get_hstart() as f32,
@@ -195,7 +196,95 @@ impl Dash {
     }
 
     fn create_weather(&mut self, weather_area: &mut Area) {
-        self.weather_provider.check_sky();
+        let weather = self.weather_provider.check_sky();
+
+        let day_font = self.font_collection.load_font(Font::Wellfleet);
+        let weather_font = self.font_collection.load_font(Font::Dina);
+        let mut y_off = 0;
+        weather_area.put_text(
+            &day_font,
+            LayoutSettings {
+                x: weather_area.get_hstart() as f32,
+                y: y_off as f32,
+                max_width: Some(weather_area.get_available_hspace() as f32),
+                max_height: Some(weather_area.get_available_vspace() as f32),
+                horizontal_align: HorizontalAlign::Center,
+                ..LayoutSettings::default()
+            },
+            &[TextStyle::new("Now", 23.0, 0)],
+            100,
+        );
+        y_off += 30;
+
+        let mut now_area = Area::new(
+            0,
+            y_off,
+            weather_area.get_available_hspace(),
+            50,
+            Color::White,
+            Padding::full(0),
+            Outline {
+                left: 0,
+                right: 0,
+                color: Color::Black,
+                top: 1,
+                bottom: 1,
+            },
+        );
+        now_area.auto_layout_text_size(
+            &weather_font,
+            LayoutSettings {
+                x: now_area.get_hstart() as f32,
+                y: 0.0,
+                max_width: Some(now_area.get_available_hspace() as f32),
+                max_height: Some((now_area.get_available_vspace()) as f32),
+                horizontal_align: HorizontalAlign::Center,
+                ..LayoutSettings::default()
+            },
+            &[TextStyle::new(
+                wmo_weather_code_to_str(weather.current.weather_code),
+                24.0,
+                0,
+            )],
+            40,
+            24.0,
+        );
+        now_area.put_text(
+            &weather_font,
+            LayoutSettings {
+                x: now_area.get_hstart() as f32,
+                y: 28.0,
+                max_width: Some(now_area.get_available_hspace() as f32),
+                max_height: Some((now_area.get_available_vspace()) as f32),
+                horizontal_align: HorizontalAlign::Center,
+                ..LayoutSettings::default()
+            },
+            &[TextStyle::new(
+                format!(
+                    "{}°C {}%",
+                    weather.current.temperature, weather.current.humidity
+                )
+                .as_str(),
+                20.0,
+                0,
+            )],
+            40,
+        );
+
+        weather_area.add_sub_area(now_area);
+
+        y_off += 30;
+
+        const DAYS: usize = 2;
+        let mut date = chrono::Local::now().date_naive();
+
+        for i in 0..DAYS {
+            date = date.add(TimeDelta::days(1));
+            let weather = weather
+                .days
+                .get(&date)
+                .expect("No weather found for that day");
+        }
     }
 
     fn create_dashboard(&mut self) -> EpdImage {
@@ -281,7 +370,7 @@ impl Dash {
 
         let now = chrono::Local::now();
         let now_str = now.format("%H:%M").to_string();
-        misc_column.try_put_text(
+        misc_column.put_text(
             &font,
             LayoutSettings {
                 max_width: Some(misc_column.get_available_hspace() as f32),

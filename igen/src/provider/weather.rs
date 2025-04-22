@@ -1,6 +1,7 @@
 use crate::settings::Config;
 use chrono::{NaiveDate, TimeDelta};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::ops::Add;
 
 #[derive(Deserialize, Debug)]
@@ -29,7 +30,6 @@ struct Daily {
 }
 
 pub struct NiceDaily {
-    pub date: NaiveDate,
     pub sunshine: f64,
     pub temp_min: f64,
     pub temp_max: f64,
@@ -44,7 +44,7 @@ pub struct NiceCurrent {
 
 pub struct NiceWeatherData {
     pub current: NiceCurrent,
-    pub days: Vec<NiceDaily>,
+    pub days: HashMap<NaiveDate, NiceDaily>,
 }
 
 impl From<WeatherData> for NiceWeatherData {
@@ -54,16 +54,18 @@ impl From<WeatherData> for NiceWeatherData {
             humidity: value.current.humidity,
             weather_code: value.current.weather_code,
         };
-        let mut nd: Vec<NiceDaily> = vec![];
+        let mut nd: HashMap<NaiveDate, NiceDaily> = HashMap::new();
         let today = chrono::Local::now().date_naive();
         for i in 0..value.daily.weather_code.len() {
-            nd.push(NiceDaily {
-                date: today.add(TimeDelta::days(i as i64)),
-                temp_min: value.daily.temperature_min[i],
-                temp_max: value.daily.temperature_max[i],
-                sunshine: value.daily.sunshine_duration[i],
-                weather_code: value.daily.weather_code[i],
-            });
+            nd.insert(
+                today.add(TimeDelta::days(i as i64)),
+                NiceDaily {
+                    temp_min: value.daily.temperature_min[i],
+                    temp_max: value.daily.temperature_max[i],
+                    sunshine: value.daily.sunshine_duration[i],
+                    weather_code: value.daily.weather_code[i],
+                },
+            );
         }
         NiceWeatherData {
             current: nc,

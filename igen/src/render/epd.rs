@@ -213,7 +213,7 @@ impl Area {
             }
         }
 
-        self.try_put_text(
+        self.put_text(
             font,
             layout_settings,
             largest_text_styles.as_slice(),
@@ -221,7 +221,7 @@ impl Area {
         )
     }
 
-    pub fn try_put_text(
+    pub fn put_text(
         &mut self,
         font: &Font,
         layout_settings: LayoutSettings,

@@ -1,7 +1,7 @@
 use crate::provider::google::{CalendarProvider, Event, Time};
 use crate::provider::image::ImageProvider;
 use crate::provider::quote::QuoteProvider;
-use crate::provider::weather::{NiceCurrent, NiceDaily, WeatherProvider, wmo_weather_code_to_str};
+use crate::provider::weather::{NiceDaily, WeatherProvider, wmo_weather_code_to_str};
 use crate::render::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::render::fonts::{Font, FontCollection};
 use crate::render::graphics::{Color, Rect};
@@ -11,7 +11,7 @@ use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign}
 use image::imageops;
 use log::debug;
 use std::collections::{BTreeSet, HashMap};
-use std::ops::{Add, Div};
+use std::ops::Add;
 
 pub struct Dash {
     previous_frame: Option<EpdImage>,

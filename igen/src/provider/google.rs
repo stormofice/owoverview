@@ -1,5 +1,5 @@
 use crate::provider::google::Time::{AllDay, Timed};
-use crate::settings::{Config, GoogleConfig};
+use crate::settings::Config;
 use std::cmp::Ordering;
 
 use log::{debug, warn};

@@ -275,11 +275,6 @@ impl Area {
     }
 
     pub fn load_image(&mut self, x: usize, y: usize, image: &DynamicImage) {
-        println!(
-            "{} {}",
-            self.get_available_hspace(),
-            self.get_available_vspace()
-        );
         if (image.width() > self.get_available_hspace() as u32)
             || (image.height() > self.get_available_vspace() as u32)
         {
@@ -301,8 +296,8 @@ impl Area {
                 };
                 self.canvas.set_px(
                     &mut self.buf,
-                    (x as usize + offset_x),
-                    (y as usize + offset_y),
+                    x as usize + offset_x,
+                    y as usize + offset_y,
                     color,
                 );
             }

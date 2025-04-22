@@ -1,7 +1,7 @@
 use crate::provider::google::{CalendarProvider, Event, Time};
 use crate::provider::image::ImageProvider;
 use crate::provider::quote::QuoteProvider;
-use crate::provider::weather::{NiceCurrent, WeatherProvider, wmo_weather_code_to_str};
+use crate::provider::weather::{NiceCurrent, NiceDaily, WeatherProvider, wmo_weather_code_to_str};
 use crate::render::epd::{Area, EPD_HEIGHT, EPD_WIDTH, EpdImage, Outline, Padding};
 use crate::render::fonts::{Font, FontCollection};
 use crate::render::graphics::{Color, Rect};
@@ -11,7 +11,7 @@ use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign}
 use image::imageops;
 use log::debug;
 use std::collections::{BTreeSet, HashMap};
-use std::ops::Add;
+use std::ops::{Add, Div};
 
 pub struct Dash {
     previous_frame: Option<EpdImage>,
@@ -201,6 +201,7 @@ impl Dash {
         let day_font = self.font_collection.load_font(Font::Wellfleet);
         let weather_font = self.font_collection.load_font(Font::Dina);
         let mut y_off = 0;
+        const DAY_NAME_STEP_SIZE: usize = 28;
         weather_area.put_text(
             &day_font,
             LayoutSettings {
@@ -209,12 +210,13 @@ impl Dash {
                 max_width: Some(weather_area.get_available_hspace() as f32),
                 max_height: Some(weather_area.get_available_vspace() as f32),
                 horizontal_align: HorizontalAlign::Center,
+                vertical_align: VerticalAlign::Top,
                 ..LayoutSettings::default()
             },
             &[TextStyle::new("Now", 23.0, 0)],
             100,
         );
-        y_off += 30;
+        y_off += DAY_NAME_STEP_SIZE;
 
         let mut now_area = Area::new(
             0,
@@ -271,20 +273,104 @@ impl Dash {
             40,
         );
 
+        y_off += now_area.space.height;
         weather_area.add_sub_area(now_area);
 
-        y_off += 30;
+        let tomorrow = weather
+            .days
+            .get(&chrono::Local::now().date_naive().add(TimeDelta::days(1)))
+            .expect("There is no tomorrow");
+        let day_after_tmrw = weather
+            .days
+            .get(&chrono::Local::now().date_naive().add(TimeDelta::days(2)))
+            .expect("There is no day after tomorrow");
 
-        const DAYS: usize = 2;
-        let mut date = chrono::Local::now().date_naive();
+        let mut show_weather_for_day = |day: &NiceDaily, name: &str| {
+            weather_area.put_text(
+                &day_font,
+                LayoutSettings {
+                    x: weather_area.get_hstart() as f32,
+                    y: y_off as f32,
+                    max_width: Some(weather_area.get_available_hspace() as f32),
+                    max_height: Some(weather_area.get_available_vspace() as f32),
+                    horizontal_align: HorizontalAlign::Center,
+                    ..LayoutSettings::default()
+                },
+                &[TextStyle::new(name, 23.0, 0)],
+                100,
+            );
 
-        for i in 0..DAYS {
-            date = date.add(TimeDelta::days(1));
-            let weather = weather
-                .days
-                .get(&date)
-                .expect("No weather found for that day");
-        }
+            y_off += DAY_NAME_STEP_SIZE;
+
+            let mut day_area = Area::new(
+                0,
+                y_off,
+                weather_area.get_available_hspace(),
+                50,
+                Color::White,
+                Padding::full(0),
+                Outline {
+                    left: 0,
+                    right: 0,
+                    color: Color::Black,
+                    top: 1,
+                    bottom: 1,
+                },
+            );
+
+            let max_wmo_size = if wmo_weather_code_to_str(day.weather_code).len() >= 19 {
+                20.0
+            } else {
+                24.0
+            };
+
+            day_area.auto_layout_text_size(
+                &weather_font,
+                LayoutSettings {
+                    x: day_area.get_hstart() as f32,
+                    y: 0.0,
+                    max_width: Some(day_area.get_available_hspace() as f32),
+                    max_height: Some(18f32),
+                    horizontal_align: HorizontalAlign::Center,
+                    ..LayoutSettings::default()
+                },
+                &[TextStyle::new(
+                    wmo_weather_code_to_str(day.weather_code),
+                    0.0,
+                    0,
+                )],
+                40,
+                max_wmo_size,
+            );
+            day_area.put_text(
+                &weather_font,
+                LayoutSettings {
+                    x: day_area.get_hstart() as f32,
+                    y: 28.0,
+                    max_width: Some(day_area.get_available_hspace() as f32),
+                    max_height: Some((day_area.get_available_vspace()) as f32),
+                    horizontal_align: HorizontalAlign::Center,
+                    ..LayoutSettings::default()
+                },
+                &[TextStyle::new(
+                    format!(
+                        "{:05.2}°C-{:04.2}°C {:02}h",
+                        day.temp_min,
+                        day.temp_max,
+                        (day.sunshine / 3600f64).round() as usize
+                    )
+                    .as_str(),
+                    20.0,
+                    0,
+                )],
+                40,
+            );
+            y_off += day_area.space.height;
+            weather_area.add_sub_area(day_area);
+        };
+
+        show_weather_for_day(tomorrow, "Tomorrow");
+        show_weather_for_day(day_after_tmrw, "Tomorrow++");
     }
 
     fn create_dashboard(&mut self) -> EpdImage {

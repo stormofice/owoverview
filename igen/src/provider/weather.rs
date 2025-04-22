@@ -141,6 +141,8 @@ impl WeatherProvider {
             .json::<WeatherData>()
             .expect("Weather data was invalid JSON");
 
+        dbg!(&weather);
+
         weather.into()
     }
 }

@@ -8,6 +8,7 @@ use crate::render::graphics::{Color, Rect};
 use crate::settings::Config;
 use chrono::{NaiveDate, TimeDelta};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
+use image::imageops::FilterType;
 use image::{DynamicImage, imageops};
 use log::debug;
 use reqwest::blocking::multipart;
@@ -584,11 +585,17 @@ impl Dash {
             .map(|et| et.unwrap().file_name().to_str().unwrap().to_string())
             .collect::<Vec<String>>();
         frame_paths.sort();
+
+        const FRAME_WIDTH: usize = 480 / 2;
+        const FRAME_HEIGHT: usize = 360 / 2;
+
         let client = reqwest::blocking::Client::new();
         for path in frame_paths.iter().skip(100) {
             let path = FRAMES_PATH.to_string() + path.as_str();
             println!("playing {:?}", &path);
-            let frame = image::open(path).expect("Could not load image");
+            let frame = image::open(path)
+                .expect("Could not load image")
+                .resize_exact(FRAME_WIDTH as u32, FRAME_HEIGHT as u32, FilterType::Nearest);
             let mut img = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
             let mut whole = Area::new(
                 0,
@@ -602,7 +609,7 @@ impl Dash {
             whole.load_image(0, 0, &frame);
             whole.draw(&mut img);
 
-            let abc = img.to_partial(0, 0, 480, 360);
+            let abc = img.to_partial(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
             // Send partial update
             let form = multipart::Form::new().part(
                 "data",
@@ -613,13 +620,19 @@ impl Dash {
             );
 
             let response = client
-                .post("http://192.168.178.61/direct_image_partial?rect=0,0,480,360")
+                .post(
+                    format!(
+                        "http://192.168.178.61/direct_image_partial?rect=0,0,{},{}",
+                        FRAME_WIDTH, FRAME_HEIGHT
+                    )
+                    .as_str(),
+                )
                 .multipart(form)
                 .send()
                 .expect("Could not send request");
             println!("{:?} {:?}", response.status(), response.text());
 
-            thread::sleep(Duration::from_millis(500));
+            // thread::sleep(Duration::from_millis(50));
         }
     }
 }

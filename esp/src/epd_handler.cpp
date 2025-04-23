@@ -17,6 +17,9 @@ void EpdHandler::start_worker()
             while (true) {
                 if (xQueueReceive(*queue_handle, &msg, portMAX_DELAY)) {
                     printf("Received message: %d\r\n", msg.getKind());
+                    const auto mem = xPortGetFreeHeapSize();
+                    printf("free heap: %d (bytes) %d (kb)\r\n", mem, mem / 1024);
+
                     // Process the message
                     switch (msg.getKind()) {
                         case EpdJobKind::Clear:
@@ -92,7 +95,7 @@ void EpdHandler::start_worker()
                                 printf("size mismatch\r\n");
                             }
                             else {
-                                delay(120);
+                                // delay(50);
                                 EPD_7IN5_V2_Display_Part(msg.getData(), x, y, x + w, y + h);
                             }
                             // prevent mem leak

@@ -24,5 +24,6 @@ fn main() {
 
     let mut dash = Dash::new(config);
 
-    dash.draw();
+    dash.play_video();
+    // dash.draw();
 }

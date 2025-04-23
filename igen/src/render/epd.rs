@@ -388,7 +388,7 @@ impl EpdImage {
         file.write_all(&self.data).unwrap();
     }
 
-    pub fn to_file_partial(&self, filename: &str, x: usize, y: usize, w: usize, h: usize) {
+    pub fn to_partial(&self, x: usize, y: usize, w: usize, h: usize) -> Vec<u8> {
         let mut partial = vec![0u8; w.div_ceil(8) * h];
 
         for y in y..(y + h) {
@@ -401,9 +401,12 @@ impl EpdImage {
                 }
             }
         }
+        partial
+    }
 
+    pub fn to_file_partial(&self, filename: &str, x: usize, y: usize, w: usize, h: usize) {
         let mut file = std::fs::File::create(filename).unwrap();
-        file.write_all(&partial)
+        file.write_all(&self.to_partial(x, y, w, h))
             .expect("Could not write partial file");
     }
 
@@ -423,5 +426,9 @@ impl EpdImage {
             }
         }
         image.save(filename).expect("Could not save image")
+    }
+
+    pub fn raw(&self) -> &[u8] {
+        self.data.as_slice()
     }
 }

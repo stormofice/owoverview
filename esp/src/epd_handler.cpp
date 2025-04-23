@@ -31,6 +31,9 @@ void EpdHandler::start_worker()
                         case EpdJobKind::Sleep:
                             EPD_7IN5_V2_Sleep();
                             break;
+                        case EpdJobKind::InitPartial:
+                            EPD_7IN5_V2_Init_Part();
+                            break;
                         case EpdJobKind::Init:
                             EPD_7IN5_V2_Init();
                             break;
@@ -75,6 +78,26 @@ void EpdHandler::start_worker()
                             delete msg.getData();
                             EPD_7IN5_V2_Sleep();
 
+                            break;
+                        }
+                        case EpdJobKind::DirectPartial: {
+                            printf("direct partial task, buf: %p, len: %d\r\n", msg.getData(), msg.getSize());
+                            const auto x = msg.getAux(0);
+                            const auto y = msg.getAux(1);
+                            const auto w = msg.getAux(2);
+                            const auto h = msg.getAux(3);
+                            printf("x: %llu, y: %llu, w: %llu, h: %llu\r\n", x,y,w,h);
+                            // ensure size match
+                            if (msg.getSize() != ((w / 8) * h)) {
+                                printf("size mismatch\r\n");
+                            }
+                            else {
+                                delay(120);
+                                EPD_7IN5_V2_Display_Part(msg.getData(), x, y, x + w, y + h);
+                            }
+                            // prevent mem leak
+                            delete msg.getData();
+                            printf("direct done\r\n");
                             break;
                         }
                         case EpdJobKind::Undefined:

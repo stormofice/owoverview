@@ -8,10 +8,14 @@ use crate::render::graphics::{Color, Rect};
 use crate::settings::Config;
 use chrono::{NaiveDate, TimeDelta};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
-use image::imageops;
+use image::{DynamicImage, imageops};
 use log::debug;
+use reqwest::blocking::multipart;
 use std::collections::{BTreeSet, HashMap};
+use std::fs::FileType;
 use std::ops::Add;
+use std::time::Duration;
+use std::{fs, thread};
 
 pub struct Dash {
     previous_frame: Option<EpdImage>,
@@ -562,5 +566,60 @@ impl Dash {
         current.to_file("output.bin");
 
         self.previous_frame = Some(current)
+    }
+
+    pub fn play_video(&mut self) {
+        const FRAMES_PATH: &str = "./bad_apple/";
+        let mut frame_paths = fs::read_dir(FRAMES_PATH)
+            .expect("Could not read dir")
+            .filter(|e| {
+                e.as_ref().unwrap().file_type().unwrap().is_file()
+                    && e.as_ref()
+                        .unwrap()
+                        .file_name()
+                        .to_str()
+                        .unwrap()
+                        .ends_with(".bmp")
+            })
+            .map(|et| et.unwrap().file_name().to_str().unwrap().to_string())
+            .collect::<Vec<String>>();
+        frame_paths.sort();
+        let client = reqwest::blocking::Client::new();
+        for path in frame_paths.iter().skip(100) {
+            let path = FRAMES_PATH.to_string() + path.as_str();
+            println!("playing {:?}", &path);
+            let frame = image::open(path).expect("Could not load image");
+            let mut img = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
+            let mut whole = Area::new(
+                0,
+                0,
+                EPD_WIDTH,
+                EPD_HEIGHT,
+                Color::White,
+                Padding::full(0),
+                Outline::none(),
+            );
+            whole.load_image(0, 0, &frame);
+            whole.draw(&mut img);
+
+            let abc = img.to_partial(0, 0, 480, 360);
+            // Send partial update
+            let form = multipart::Form::new().part(
+                "data",
+                multipart::Part::bytes(abc)
+                    .file_name("file")
+                    .mime_str("application/octet-stream")
+                    .expect("Could not create multiform data"),
+            );
+
+            let response = client
+                .post("http://192.168.178.61/direct_image_partial?rect=0,0,480,360")
+                .multipart(form)
+                .send()
+                .expect("Could not send request");
+            println!("{:?} {:?}", response.status(), response.text());
+
+            thread::sleep(Duration::from_millis(500));
+        }
     }
 }

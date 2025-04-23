@@ -12,7 +12,9 @@ enum class EpdJobKind
     Sleep,
     Display,
     Init,
+    InitPartial,
     DisplayPartial,
+    DirectPartial,
 
     Undefined,
 };

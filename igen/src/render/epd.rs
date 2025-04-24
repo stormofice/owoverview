@@ -286,10 +286,11 @@ impl Area {
         for y in 0..image.height() {
             for x in 0..image.width() {
                 let pixel = image.get_pixel(x, y);
-                let rgb = pixel.to_rgb();
 
-                let avg = (rgb[0] as u32 + rgb[1] as u32 + rgb[2] as u32) / 3;
-                let color = if avg > 127 {
+                let rgba = pixel.to_rgba();
+
+                let avg = (rgba[0] as u32 + rgba[1] as u32 + rgba[2] as u32) / 3;
+                let color = if avg > 127 || rgba[3] == 0 {
                     PixelColor::White
                 } else {
                     PixelColor::Black

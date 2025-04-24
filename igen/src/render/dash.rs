@@ -8,15 +8,12 @@ use crate::render::graphics::{Color, Rect};
 use crate::settings::Config;
 use chrono::{NaiveDate, TimeDelta};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
-use image::imageops::FilterType;
-use image::{DynamicImage, imageops};
+use image::imageops;
 use log::debug;
 use reqwest::blocking::multipart;
 use std::collections::{BTreeSet, HashMap};
-use std::fs::FileType;
+use std::fs;
 use std::ops::Add;
-use std::time::Duration;
-use std::{fs, thread};
 
 pub struct Dash {
     previous_frame: Option<EpdImage>,
@@ -595,7 +592,11 @@ impl Dash {
             println!("playing {:?}", &path);
             let frame = image::open(path)
                 .expect("Could not load image")
-                .resize_exact(FRAME_WIDTH as u32, FRAME_HEIGHT as u32, FilterType::Nearest);
+                .resize_exact(
+                    FRAME_WIDTH as u32,
+                    FRAME_HEIGHT as u32,
+                    imageops::FilterType::Nearest,
+                );
             let mut img = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
             let mut whole = Area::new(
                 0,

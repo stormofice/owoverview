@@ -254,21 +254,21 @@ impl CalendarProvider {
             };
 
             if is_expired {
-                if let Some(refresh_token_str) = stored_token.refresh_token {
+                if let Some(refresh_token_str) = &stored_token.refresh_token {
                     debug!("Access token expired. Refreshing...");
 
-                    let refresh_token = RefreshToken::new(refresh_token_str);
+                    let refresh_token = RefreshToken::new(refresh_token_str.clone());
                     let oauth_client = create_oauth_client!(self);
                     let token_response = oauth_client
                         .exchange_refresh_token(&refresh_token)
                         .request(&self.http_client)
                         .expect("Could not exchange refresh token");
-                    self.store_token(&token_response);
+                    self.store_token(&token_response, Some(&stored_token));
                     token_response.access_token().secret().clone()
                 } else {
                     warn!("No refresh token in file. Authenticating...");
                     let tok = self.authenticate();
-                    self.store_token(&tok);
+                    self.store_token(&tok, Some(&stored_token));
                     tok.access_token().secret().clone()
                 }
             } else {
@@ -278,17 +278,27 @@ impl CalendarProvider {
         } else {
             debug!("Found no token file, authenticating");
             let tok = self.authenticate();
-            self.store_token(&tok);
+            self.store_token(&tok, None);
             tok.access_token().secret().clone()
         }
     }
 
-    fn store_token(&self, token_response: &BasicTokenResponse) {
+    fn store_token(&self, token_response: &BasicTokenResponse, previous: Option<&StoredToken>) {
+        let refresh_token: Option<&String> = if let Some(refresh) = token_response.refresh_token() {
+            Some(refresh.secret())
+        } else if let Some(prev) = previous {
+            if let Some(refresh) = &prev.refresh_token {
+                Some(refresh)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let stored_token = StoredToken {
             access_token: token_response.access_token().secret().to_string(),
-            refresh_token: token_response
-                .refresh_token()
-                .map(|rt| rt.secret().to_string()),
+            refresh_token: refresh_token.cloned(),
             expires_at: token_response
                 .expires_in()
                 .map(|d| chrono::Utc::now().add(d)),

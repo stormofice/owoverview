@@ -432,12 +432,13 @@ impl Dash {
             right_column.get_available_hspace() - 100,
             0,
             100,
-            right_column.get_available_vspace() - quote_area.space.height,
+            // right_column.get_available_vspace() - quote_area.space.height,
+            40,
             Color::White,
             Padding::full(0),
             Outline {
                 color: Color::Black,
-                bottom: 0,
+                bottom: 1,
                 top: 0,
                 left: 1,
                 right: 0,
@@ -447,7 +448,8 @@ impl Dash {
         let mut image_area = Area::new(
             0,
             0,
-            right_column.get_available_hspace() - misc_column.space.width,
+            // right_column.get_available_hspace() - misc_column.space.width,
+            right_column.get_available_hspace(),
             right_column.get_available_vspace() - quote_area.space.height,
             Color::White,
             Padding::full(0),
@@ -467,7 +469,7 @@ impl Dash {
                 ..LayoutSettings::default()
             },
             &[TextStyle::new(now_str.as_str(), 32f32, 0)],
-            120,
+            110,
         );
 
         right_column.add_sub_area(quote_area);

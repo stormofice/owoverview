@@ -1,5 +1,6 @@
 use crate::settings::Config;
 use image::DynamicImage;
+use image::imageops::FilterType;
 use std::collections::VecDeque;
 use std::fs;
 use std::path::Path;
@@ -41,7 +42,19 @@ impl ImageProvider {
                 }
                 self.get_image()
             }
-            Some(d) => image::open(d).expect("Could not load image"),
+            Some(d) => {
+                let base = image::open(d).expect("Could not load image").resize_exact(
+                    800,
+                    480,
+                    FilterType::Nearest,
+                );
+                let dithered = dither::error_diffusion_quantise(
+                    &base,
+                    &dither::diffusion_matrices::JARVIS_JUDICE_NINKE,
+                    false,
+                );
+                DynamicImage::from(dithered)
+            }
         }
     }
 }

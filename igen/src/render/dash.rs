@@ -583,7 +583,7 @@ impl Dash {
                 if self.partial_update_counter < MAX_PARTIAL_UPDATES {
                     info!("Sending partial update {:?}", bbox);
                     self.partial_update_counter += 1;
-                    RenderAction::Partial(bbox, raw_data)
+                    RenderAction::Partial(bbox, current.to_partial_from_rect(bbox))
                 } else {
                     self.partial_update_counter = 0;
                     RenderAction::Full(raw_data)

@@ -97,7 +97,7 @@ async fn image(State(state): State<AppState>) -> Response {
         .unwrap()
 }
 
-async fn nice_image(State(state): State<AppState>) -> Response {
+async fn nice_image() -> Response {
     match tokio::fs::read("output.png").await {
         Ok(img_data) => Response::builder()
             .header("Content-Type", "image/png")

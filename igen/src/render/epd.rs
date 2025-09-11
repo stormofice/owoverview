@@ -393,6 +393,10 @@ impl EpdImage {
         file.write_all(&self.data).unwrap();
     }
 
+    pub fn to_partial_from_rect(&self, rect: Rect) -> Vec<u8> {
+        self.to_partial(rect.x, rect.y, rect.width, rect.height)
+    }
+
     pub fn to_partial(&self, x: usize, y: usize, w: usize, h: usize) -> Vec<u8> {
         let mut partial = vec![0u8; w.div_ceil(8) * h];
 

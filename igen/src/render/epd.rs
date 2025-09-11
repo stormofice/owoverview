@@ -397,7 +397,16 @@ impl EpdImage {
         self.to_partial(rect.x, rect.y, rect.width, rect.height)
     }
 
-    pub fn to_partial(&self, x: usize, y: usize, w: usize, h: usize) -> Vec<u8> {
+    fn round_to_mul(n: usize) -> usize {
+        n.div_ceil(8) * 8
+    }
+
+    pub fn to_partial(&self, mut x: usize, mut y: usize, mut w: usize, mut h: usize) -> Vec<u8> {
+        // TODO: Unmessify
+        x = Self::round_to_mul(x);
+        y = Self::round_to_mul(y);
+        w = Self::round_to_mul(w);
+        h = Self::round_to_mul(h);
         let mut partial = vec![0u8; w.div_ceil(8) * h];
 
         for y in y..(y + h) {

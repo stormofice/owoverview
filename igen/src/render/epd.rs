@@ -400,11 +400,11 @@ impl EpdImage {
     pub fn to_partial(&self, x: usize, y: usize, w: usize, h: usize) -> Vec<u8> {
         let mut partial = vec![0u8; w.div_ceil(8) * h];
 
-        for y in y..(y + h) {
-            for x in x..(x + w) {
-                let byte_index = (y * w + x) / 8;
-                let bit_index = x % 8;
-                match self.get_pixel(x, y) {
+        for row in 0..h {
+            for col in 0..w {
+                let byte_index = (row * w + col) / 8;
+                let bit_index = col % 8;
+                match self.get_pixel(x + col, y + row) {
                     PixelColor::White => partial[byte_index] |= 1 << (7 - bit_index),
                     PixelColor::Black => partial[byte_index] &= !(1 << (7 - bit_index)),
                 }

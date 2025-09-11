@@ -9,12 +9,8 @@ enum class EpdJobKind
 {
     Clear,
     ClearBlack,
-    Sleep,
     Display,
-    Init,
-    InitPartial,
     DisplayPartial,
-    DirectPartial,
 
     Undefined,
 };

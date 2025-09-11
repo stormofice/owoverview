@@ -5,8 +5,6 @@
 
 class Fetcher
 {
-    HttpClient client;
 public:
     EpdJob fetch();
-    void init(WiFiClient wifi);
 };

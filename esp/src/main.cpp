@@ -8,7 +8,7 @@ static QueueHandle_t ipc_queue = xQueueCreate(10, sizeof(EpdJob));
 
 // ReSharper disable CppUseAuto
 static EpdHandler epd = EpdHandler(ipc_queue);
-static Fetcher fetcher = Fetcher{};
+static Fetcher fetcher = Fetcher();
 // ReSharper restore CppUseAuto
 
 void setup_wifi()
@@ -37,9 +37,14 @@ void setup()
 
     epd.start_worker();
 
+
+
 }
 
 void loop()
 {
-    fetcher.fetch();
+    const auto job = fetcher.fetch();
+    xQueueSendToBack(ipc_queue, &job, portMAX_DELAY);
+
+    delay(1000 * 60);
 }

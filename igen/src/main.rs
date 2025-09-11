@@ -62,7 +62,7 @@ async fn root() -> &'static str {
     "🦕"
 }
 
-async fn image(State(state): State<AppState>) -> Bytes {
+async fn image(State(state): State<AppState>) -> Response {
     // probability of correct concurrency: 40%
     let mut dash = { state.dash.lock().await };
 
@@ -90,7 +90,11 @@ async fn image(State(state): State<AppState>) -> Bytes {
         }
     };
 
-    Bytes::from(img_data)
+    let bytes = Bytes::from(img_data);
+    Response::builder()
+        .header("Content-Length", bytes.len().to_string())
+        .body(bytes.into())
+        .unwrap()
 }
 
 async fn nice_image(State(state): State<AppState>) -> Response {

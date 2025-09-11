@@ -531,6 +531,10 @@ impl Dash {
     }
 
     fn get_change_bbox(&self, current: &EpdImage) -> Option<Rect> {
+        fn round_to_mul(n: usize) -> usize {
+            n.div_ceil(8) * 8
+        }
+
         if let Some(previous) = &self.previous_frame {
             let mut xmin = EPD_WIDTH;
             let mut ymin = EPD_HEIGHT;
@@ -555,10 +559,10 @@ impl Dash {
             }
 
             Some(Rect {
-                x: xmin,
-                y: ymin,
-                width: (xmax - xmin),
-                height: (ymax - ymin),
+                x: round_to_mul(xmin),
+                y: round_to_mul(ymin),
+                width: round_to_mul(xmax - xmin),
+                height: round_to_mul(ymax - ymin),
             })
         } else {
             None

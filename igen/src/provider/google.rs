@@ -80,7 +80,7 @@ struct StoredToken {
 
 pub struct CalendarProvider {
     config: Config,
-    http_client: reqwest::blocking::Client,
+    http_client: reqwest::Client,
     calendar_list: Option<CalendarListResponse>,
 }
 
@@ -166,20 +166,20 @@ macro_rules! create_oauth_client {
 }
 
 impl CalendarProvider {
-    pub fn new(config: Config) -> Self {
+    pub async fn new(config: Config) -> Self {
         let cl = CalendarProvider {
             config,
-            http_client: reqwest::blocking::ClientBuilder::new()
+            http_client: reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
                 .build()
                 .expect("HTTP client could not be constructed"),
             calendar_list: None,
         };
-        cl.load_or_refresh_token();
+        cl.load_or_refresh_token().await;
         cl
     }
 
-    fn authenticate(&self) -> BasicTokenResponse {
+    async fn authenticate(&self) -> BasicTokenResponse {
         let client = create_oauth_client!(self);
 
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
@@ -238,11 +238,12 @@ impl CalendarProvider {
         client
             .exchange_code(code)
             .set_pkce_verifier(pkce_code_verifier)
-            .request(&self.http_client)
+            .request_async(&self.http_client)
+            .await
             .expect("Could not get token response")
     }
 
-    fn load_or_refresh_token(&self) -> String {
+    async fn load_or_refresh_token(&self) -> String {
         if Path::new(&self.config.google.token_path).exists() {
             let token_str = fs::read_to_string(&self.config.google.token_path).expect("");
             let stored_token: StoredToken = serde_json::from_str(&token_str).expect("");
@@ -261,13 +262,14 @@ impl CalendarProvider {
                     let oauth_client = create_oauth_client!(self);
                     let token_response = oauth_client
                         .exchange_refresh_token(&refresh_token)
-                        .request(&self.http_client)
+                        .request_async(&self.http_client)
+                        .await
                         .expect("Could not exchange refresh token");
                     self.store_token(&token_response, Some(&stored_token));
                     token_response.access_token().secret().clone()
                 } else {
                     warn!("No refresh token in file. Authenticating...");
-                    let tok = self.authenticate();
+                    let tok = self.authenticate().await;
                     self.store_token(&tok, Some(&stored_token));
                     tok.access_token().secret().clone()
                 }
@@ -277,7 +279,7 @@ impl CalendarProvider {
             }
         } else {
             debug!("Found no token file, authenticating");
-            let tok = self.authenticate();
+            let tok = self.authenticate().await;
             self.store_token(&tok, None);
             tok.access_token().secret().clone()
         }
@@ -310,31 +312,32 @@ impl CalendarProvider {
         .expect("Could not store token");
     }
 
-    fn retrieve_calendar_events(&mut self) -> Vec<Event> {
+    async fn retrieve_calendar_events(&mut self) -> Vec<Event> {
         if self.calendar_list.is_none() {
-            self.fetch_calenders()
+            self.fetch_calenders().await
         }
 
         let clr = self.calendar_list.as_ref().expect("Calendar list unset");
 
         let mut combined_events: Vec<Event> = vec![];
 
-        clr.items
+        for cal in clr
+            .items
             .iter()
             .filter(|cal| self.config.google.calendar_list.contains(&cal.summary))
-            .for_each(|cal| {
-                let id = &cal.id;
-                for event in self.fetch_events_for_calendar(id) {
-                    combined_events.push(event);
-                }
-            });
+        {
+            let id: &String = &cal.id;
+            for event in self.fetch_events_for_calendar(id).await {
+                combined_events.push(event);
+            }
+        }
 
         combined_events.sort_by(|f, s| f.time.cmp(&s.time));
 
         combined_events
     }
 
-    fn fetch_events_for_calendar(&self, cal_id: &str) -> Vec<Event> {
+    async fn fetch_events_for_calendar(&self, cal_id: &str) -> Vec<Event> {
         let events_url = format!(
             "https://www.googleapis.com/calendar/v3/calendars/{}/events",
             cal_id
@@ -345,7 +348,7 @@ impl CalendarProvider {
             .get(events_url)
             .header(
                 reqwest::header::AUTHORIZATION,
-                format!("Bearer {}", self.load_or_refresh_token()),
+                format!("Bearer {}", self.load_or_refresh_token().await),
             )
             .query(&[
                 (
@@ -357,10 +360,12 @@ impl CalendarProvider {
                 ("maxResults", "10"),
             ])
             .send()
+            .await
             .expect("Could not send list calendar request");
 
         let gevents = gevents
             .json::<EventsResponse>()
+            .await
             .unwrap_or_else(|_| panic!("Could not deserialize events response, cal: {}", cal_id));
 
         let mut events: Vec<Event> = vec![];
@@ -370,7 +375,7 @@ impl CalendarProvider {
         events
     }
 
-    fn fetch_calenders(&mut self) {
+    async fn fetch_calenders(&mut self) {
         const LIST_CALENDARS: &str = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
 
         let calenders = self
@@ -378,25 +383,27 @@ impl CalendarProvider {
             .get(LIST_CALENDARS)
             .header(
                 reqwest::header::AUTHORIZATION,
-                format!("Bearer {}", self.load_or_refresh_token()),
+                format!("Bearer {}", self.load_or_refresh_token().await),
             )
             .send()
+            .await
             .expect("Could not send list calendar request");
 
         let clr = calenders
             .json::<CalendarListResponse>()
+            .await
             .expect("Could not deserialize calendars to json");
         self.calendar_list = Some(clr)
     }
 
-    pub fn fetch(&mut self) -> Vec<Event> {
+    pub async fn fetch(&mut self) -> Vec<Event> {
         if self.config.general.debug {
             vec![Event {
                 time: AllDay(chrono::Local::now().date_naive()),
                 title: "hehe".to_string(),
             }]
         } else {
-            self.retrieve_calendar_events()
+            self.retrieve_calendar_events().await
         }
     }
 }

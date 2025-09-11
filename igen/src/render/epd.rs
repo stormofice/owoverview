@@ -384,6 +384,10 @@ impl EpdImage {
         }
     }
 
+    pub fn data(&self) -> Vec<u8> {
+        self.data.clone()
+    }
+
     pub fn to_file(&self, filename: &str) {
         let mut file = std::fs::File::create(filename).unwrap();
         file.write_all(&self.data).unwrap();

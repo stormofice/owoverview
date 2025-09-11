@@ -9,14 +9,15 @@ use crate::settings::Config;
 use chrono::{NaiveDate, TimeDelta};
 use fontdue::layout::{HorizontalAlign, LayoutSettings, TextStyle, VerticalAlign};
 use image::imageops;
-use log::debug;
-use reqwest::blocking::multipart;
+use log::{debug, info};
+use reqwest::multipart;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::ops::Add;
 
 pub struct Dash {
     previous_frame: Option<EpdImage>,
+    partial_update_counter: usize,
     calendar_provider: CalendarProvider,
     quote_provider: QuoteProvider,
     image_provider: ImageProvider,
@@ -25,12 +26,20 @@ pub struct Dash {
     config: Config,
 }
 
+#[derive(Debug)]
+pub enum RenderAction {
+    Full(Vec<u8>),
+    // bbox and data
+    Partial(Rect, Vec<u8>),
+}
+
 impl Dash {
-    pub fn new(config: Config) -> Self {
+    pub async fn new(config: Config) -> Self {
         Self {
             config: config.clone(),
             previous_frame: None,
-            calendar_provider: CalendarProvider::new(config.clone()),
+            partial_update_counter: 0,
+            calendar_provider: CalendarProvider::new(config.clone()).await,
             quote_provider: QuoteProvider::new(config.quote.clone()),
             image_provider: ImageProvider::new(config.clone()),
             weather_provider: WeatherProvider::new(config.clone()),
@@ -38,7 +47,7 @@ impl Dash {
         }
     }
 
-    fn create_calendar_day_grouped(&mut self, cal: &mut Area) {
+    async fn create_calendar_day_grouped(&mut self, cal: &mut Area) {
         // This should be possible without the clone, no?
         let date_font = self.font_collection.load_font(Font::Wellfleet);
         let title_font = self.font_collection.load_font(Font::Dina);
@@ -47,6 +56,7 @@ impl Dash {
         let mut dates: BTreeSet<NaiveDate> = BTreeSet::new();
         self.calendar_provider
             .fetch()
+            .await
             .into_iter()
             .for_each(|e| match e.time {
                 Time::AllDay(nd) => {
@@ -197,8 +207,8 @@ impl Dash {
         image_area.load_image(x_off, y_off, &resized);
     }
 
-    fn create_weather(&mut self, weather_area: &mut Area) {
-        let weather = self.weather_provider.check_sky();
+    async fn create_weather(&mut self, weather_area: &mut Area) {
+        let weather = self.weather_provider.check_sky().await;
 
         let day_font = self.font_collection.load_font(Font::Wellfleet);
         let weather_font = self.font_collection.load_font(Font::Dina);
@@ -375,7 +385,7 @@ impl Dash {
         show_weather_for_day(day_after_tmrw, "Tomorrow++");
     }
 
-    fn create_dashboard(&mut self) -> EpdImage {
+    async fn create_dashboard(&mut self) -> EpdImage {
         let mut image = EpdImage::new(EPD_WIDTH, EPD_HEIGHT);
 
         let font = self.font_collection.load_font(Font::Wellfleet);
@@ -490,7 +500,7 @@ impl Dash {
                 color: Color::Black,
             },
         );
-        self.create_calendar_day_grouped(&mut calendar_area);
+        self.create_calendar_day_grouped(&mut calendar_area).await;
 
         let mut weather_area = Area::new(
             0,
@@ -507,7 +517,7 @@ impl Dash {
                 color: Color::Black,
             },
         );
-        self.create_weather(&mut weather_area);
+        self.create_weather(&mut weather_area).await;
 
         left_column.add_sub_area(calendar_area);
         left_column.add_sub_area(weather_area);
@@ -555,20 +565,44 @@ impl Dash {
         }
     }
 
-    pub fn draw(&mut self) {
-        let current = self.create_dashboard();
+    pub async fn render(&mut self, force_full: bool) -> RenderAction {
+        const MAX_PARTIAL_AREA_UPDATE_PX: usize = 200 * 50;
+        const MAX_PARTIAL_UPDATES: usize = 10;
 
-        if let Some(bbox) = self.get_change_bbox(&current) {
-            debug!("change bbox: {:?}", bbox);
-        }
+        let current = self.create_dashboard().await;
 
         current.to_img_file("output.png");
         current.to_file("output.bin");
 
-        self.previous_frame = Some(current)
+        let raw_data = current.data().clone();
+
+        let action = if !force_full && let Some(bbox) = self.get_change_bbox(&current) {
+            debug!("change bbox: {:?}", bbox);
+
+            if (bbox.width * bbox.height) < MAX_PARTIAL_AREA_UPDATE_PX {
+                if self.partial_update_counter < MAX_PARTIAL_UPDATES {
+                    info!("Sending partial update {:?}", bbox);
+                    self.partial_update_counter += 1;
+                    RenderAction::Partial(bbox, raw_data)
+                } else {
+                    self.partial_update_counter = 0;
+                    RenderAction::Full(raw_data)
+                }
+            } else {
+                RenderAction::Full(raw_data)
+            }
+        } else {
+            RenderAction::Full(raw_data)
+        };
+
+        self.previous_frame = Some(current);
+
+        debug!("Render complete");
+        // uhhhh
+        action
     }
 
-    pub fn play_video(&mut self) {
+    pub async fn play_video(&mut self) {
         const FRAMES_PATH: &str = "./bad_apple/";
         let mut frame_paths = fs::read_dir(FRAMES_PATH)
             .expect("Could not read dir")
@@ -588,7 +622,7 @@ impl Dash {
         const FRAME_WIDTH: usize = 480 / 2;
         const FRAME_HEIGHT: usize = 360 / 2;
 
-        let client = reqwest::blocking::Client::new();
+        let client = reqwest::Client::new();
         for path in frame_paths.iter().skip(100) {
             let path = FRAMES_PATH.to_string() + path.as_str();
             println!("playing {:?}", &path);
@@ -632,8 +666,9 @@ impl Dash {
                 )
                 .multipart(form)
                 .send()
+                .await
                 .expect("Could not send request");
-            println!("{:?} {:?}", response.status(), response.text());
+            println!("{:?} {:?}", response.status(), response.text().await);
 
             // thread::sleep(Duration::from_millis(50));
         }

@@ -112,18 +112,18 @@ pub fn wmo_weather_code_to_str(code: usize) -> &'static str {
 
 pub struct WeatherProvider {
     config: Config,
-    http_client: reqwest::blocking::Client,
+    http_client: reqwest::Client,
 }
 
 impl WeatherProvider {
     pub fn new(config: Config) -> WeatherProvider {
         WeatherProvider {
             config,
-            http_client: reqwest::blocking::Client::new(),
+            http_client: reqwest::Client::new(),
         }
     }
 
-    pub fn check_sky(&self) -> NiceWeatherData {
+    pub async fn check_sky(&self) -> NiceWeatherData {
         let base_url = format!(
             "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&daily=sunshine_duration,temperature_2m_max,temperature_2m_min,\
         weather_code&models=best_match&current=temperature_2m,relative_humidity_2m,\
@@ -137,8 +137,10 @@ impl WeatherProvider {
             .http_client
             .get(base_url)
             .send()
+            .await
             .expect("Could not fetch weather")
             .json::<WeatherData>()
+            .await
             .expect("Weather data was invalid JSON");
 
         weather.into()

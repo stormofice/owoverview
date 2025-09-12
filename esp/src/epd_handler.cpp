@@ -68,10 +68,11 @@ void EpdHandler::start_worker()
                             }
                             else {
                                 // This delay is mandatory (!) to prevent artifacting
-                                delay(250);
+                                delay(400);
                                 EPD_7IN5_V2_Display_Part(msg.getData(), x, y, x + w, y + h);
                             }
                             // prevent mem leak
+                            delay(100);
                             delete msg.getData();
                             EPD_7IN5_V2_Sleep();
 

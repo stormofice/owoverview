@@ -1,9 +1,10 @@
 use crate::settings::QuoteConfig;
+use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use std::collections::VecDeque;
 use std::fs;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Quote {
     pub content: String,
     pub author: String,
@@ -13,6 +14,7 @@ pub struct Quote {
 pub struct QuoteProvider {
     quote_config: QuoteConfig,
     quotes: VecDeque<Quote>,
+    cache: Option<(DateTime<Utc>, Quote)>,
 }
 
 impl QuoteProvider {
@@ -27,6 +29,13 @@ impl QuoteProvider {
     }
 
     pub fn get_quote(&mut self) -> Quote {
+        if let Some((last_refresh, last_quote)) = self.cache.as_ref() {
+            if Utc::now().signed_duration_since(last_refresh) > Duration::minutes(15) {
+            } else {
+                return last_quote.clone();
+            }
+        }
+
         match self.quotes.pop_front() {
             None => {
                 self.load_quotes();
@@ -35,7 +44,10 @@ impl QuoteProvider {
                 }
                 self.get_quote()
             }
-            Some(q) => q,
+            Some(q) => {
+                self.cache = Some((Utc::now(), q.clone()));
+                q
+            }
         }
     }
 
@@ -43,6 +55,7 @@ impl QuoteProvider {
         QuoteProvider {
             quote_config,
             quotes: VecDeque::new(),
+            cache: None,
         }
     }
 }
